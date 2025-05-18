@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Calculadora Carga VE</title>
+    <style>
+        /* Estilos generales del cuerpo de la página */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f5; /* Un gris claro para el fondo */
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh; /* Asegura que el fondo cubra toda la altura */
+            box-sizing: border-box;
+        }
+        /* Contenedor principal de la aplicación */
+        .container {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 12px; /* Bordes más redondeados */
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 420px; /* Ancho máximo para buena legibilidad */
+            box-sizing: border-box;
+        }
+        /* Título de la aplicación */
+        h1 {
+            color: #007aff; /* Azul estándar de Apple */
+            text-align: center;
+            font-size: 1.75em; /* Tamaño ajustado para móviles */
+            margin-top: 0;
+            margin-bottom: 25px;
+        }
+        /* Estilo para las etiquetas de los campos */
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600; /* Un poco más de peso */
+            color: #444;
+            font-size: 0.95em;
+        }
+        /* Estilo para los campos de entrada numérica */
+        input[type="number"] {
+            width: 100%; /* Ocupa todo el ancho disponible */
+            padding: 14px; /* Más padding para mejor toque */
+            margin-bottom: 20px;
+            border: 1px solid #c9c9d0; /* Borde sutil */
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 1em;
+            -webkit-appearance: none; /* Quita estilos por defecto en iOS */
+            -moz-appearance: textfield; /* Para Firefox */
+        }
+        /* Oculta las flechas en los campos numéricos para navegadores WebKit (Chrome, Safari) */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        /* Estilo del botón de calcular */
+        button {
+            background-color: #007aff;
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            width: 100%;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+        }
+        /* Efecto al presionar el botón */
+        button:active {
+            background-color: #005ec4;
+            transform: scale(0.98); /* Ligero encogimiento al pulsar */
+        }
+        /* Contenedor para mostrar el resultado */
+        #resultado {
+            margin-top: 25px;
+            padding: 18px;
+            background-color: #e6f2ff; /* Fondo azul claro para el resultado */
+            border: 1px solid #b3d7ff; /* Borde azul más claro */
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1.1em;
+            font-weight: 500;
+            line-height: 1.6; /* Mejora la legibilidad del resultado */
+        }
+        /* Estilo para los mensajes de error */
+        .error-mensaje {
+            color: #ff3b30; /* Rojo estándar de error en iOS */
+            background-color: #ffebee; /* Fondo rojo muy claro */
+            border: 1px solid #ffcdd2; /* Borde rojo claro */
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.9em;
+            display: none; /* Oculto por defecto */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Calculadora de Carga VE</h1>
+
+        <div id="mensajeError" class="error-mensaje"></div>
+
+        <div>
+            <label for="capacidadBateria">Capacidad total de la batería (kWh):</label>
+            <input type="number" id="capacidadBateria" inputmode="decimal" placeholder="Ej: 77" min="1" step="0.1">
+        </div>
+
+        <div>
+            <label for="porcentajeActual">Porcentaje actual de batería (%):</label>
+            <input type="number" id="porcentajeActual" inputmode="numeric" placeholder="Ej: 20" min="0" max="100" step="1">
+        </div>
+
+        <div>
+            <label for="porcentajeObjetivo">Porcentaje objetivo de batería (%):</label>
+            <input type="number" id="porcentajeObjetivo" inputmode="numeric" placeholder="Ej: 80" min="0" max="100" step="1">
+        </div>
+
+        <div>
+            <label for="potenciaCarga">Potencia de carga del punto (kW):</label>
+            <input type="number" id="potenciaCarga" inputmode="decimal" placeholder="Ej: 7.4" min="0.1" step="0.1">
+        </div>
+
+        <button onclick="calcularTiempoCarga()">Calcular Tiempo</button>
+
+        <div id="resultado" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Referencias a los elementos del DOM
+        const capacidadBateriaEl = document.getElementById('capacidadBateria');
+        const porcentajeActualEl = document.getElementById('porcentajeActual');
+        const porcentajeObjetivoEl = document.getElementById('porcentajeObjetivo');
+        const potenciaCargaEl = document.getElementById('potenciaCarga');
+        const resultadoDiv = document.getElementById('resultado');
+        const mensajeErrorDiv = document.getElementById('mensajeError');
+
+        // Función para mostrar mensajes de error
+        function mostrarError(mensaje) {
+            mensajeErrorDiv.textContent = mensaje;
+            mensajeErrorDiv.style.display = 'block';
+            resultadoDiv.style.display = 'none'; // Ocultar resultados si hay error
+        }
+
+        // Función para limpiar mensajes de error
+        function limpiarError() {
+            mensajeErrorDiv.style.display = 'none';
+            mensajeErrorDiv.textContent = '';
+        }
+
+        // Función principal para calcular el tiempo de carga
+        function calcularTiempoCarga() {
+            limpiarError(); // Limpiar errores previos
+
+            // Obtener y convertir los valores de los inputs
+            const capacidadBateria = parseFloat(capacidadBateriaEl.value);
+            const porcentajeActual = parseFloat(porcentajeActualEl.value);
+            const porcentajeObjetivo = parseFloat(porcentajeObjetivoEl.value);
+            const potenciaCarga = parseFloat(potenciaCargaEl.value);
+
+            // --- Validaciones de los datos de entrada ---
+            if (isNaN(capacidadBateria) || capacidadBateria <= 0) {
+                mostrarError("Introduce una capacidad de batería válida (mayor que 0 kWh).");
+                return;
+            }
+            if (isNaN(porcentajeActual) || porcentajeActual < 0 || porcentajeActual > 100) {
+                mostrarError("El porcentaje actual debe estar entre 0 y 100%.");
+                return;
+            }
+            if (isNaN(porcentajeObjetivo) || porcentajeObjetivo < 0 || porcentajeObjetivo > 100) {
+                mostrarError("El porcentaje objetivo debe estar entre 0 y 100%.");
+                return;
+            }
+             if (isNaN(potenciaCarga) || potenciaCarga <= 0) {
+                mostrarError("Introduce una potencia de carga válida (mayor que 0 kW).");
+                return;
+            }
+            if (porcentajeActual >= porcentajeObjetivo) {
+                mostrarError("El porcentaje objetivo debe ser mayor que el porcentaje actual.");
+                return;
+            }
+
+            // --- Cálculo del tiempo de carga ---
+            // Energía necesaria en kWh
+            const kwhNecesarios = (capacidadBateria * (porcentajeObjetivo - porcentajeActual)) / 100;
+
+            // Tiempo total en horas (decimal)
+            const tiempoEnHorasDecimal = kwhNecesarios / potenciaCarga;
+
+            // Convertir a horas y minutos
+            const horas = Math.floor(tiempoEnHorasDecimal);
+            const minutos = Math.round((tiempoEnHorasDecimal - horas) * 60);
+
+            // --- Mostrar el resultado ---
+            resultadoDiv.innerHTML = `Energía a cargar: <strong>${kwhNecesarios.toFixed(2)} kWh</strong><br>
+                                     Tiempo estimado: <strong>${horas} horas y ${minutos} minutos</strong>`;
+            resultadoDiv.style.display = 'block'; // Hacer visible el div de resultado
+        }
+    </script>
+</body>
+</html>
