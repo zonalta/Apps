@@ -2,6 +2,7 @@
 'use strict';
 
 const autenticacion = require('./autenticacion');
+const usuarios = require('./usuarios');
 
 const LIMITE_CUERPO = 2 * 1024 * 1024; // los datos reales rondan los 30 KB
 
@@ -112,6 +113,44 @@ function crearApi(almacen) {
             });
             return true;
           }
+          throw e;
+        }
+        return true;
+      }
+
+      if (ruta === '/api/usuarios' && req.method === 'GET') {
+        const colaboradores = await usuarios.listar();
+        responder(res, 200, {
+          administradores: usuarios.ADMINISTRADORES,
+          colaboradores: colaboradores,
+          esAdmin: sesion.esAdmin
+        });
+        return true;
+      }
+
+      /* Añadir o quitar acceso son operaciones de administrador. Se comprueba
+         con el dato calculado por el servidor a partir de CORREOS_AUTORIZADOS,
+         nunca con nada que mande el cliente: así un colaborador no puede darse
+         a sí mismo (ni a nadie) más permiso del que tiene. */
+      if (ruta === '/api/usuarios' && (req.method === 'POST' || req.method === 'DELETE')) {
+        if (!sesion.esAdmin) {
+          responder(res, 403, { error: 'Sólo un administrador puede gestionar quién tiene acceso.' });
+          return true;
+        }
+
+        const cuerpo = await leerCuerpo(req);
+        if (!cuerpo || !cuerpo.correo) {
+          responder(res, 400, { error: 'Falta el correo electrónico.' });
+          return true;
+        }
+
+        try {
+          const colaboradores = req.method === 'POST'
+            ? await usuarios.agregar(cuerpo.correo, sesion.correo)
+            : await usuarios.quitar(cuerpo.correo);
+          responder(res, 200, { administradores: usuarios.ADMINISTRADORES, colaboradores: colaboradores });
+        } catch (e) {
+          if (e.estado) { responder(res, e.estado, { error: e.message }); return true; }
           throw e;
         }
         return true;

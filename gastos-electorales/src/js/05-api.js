@@ -148,6 +148,13 @@
     leerEstado: function () { return peticion('/api/estado'); },
     guardarEstado: function (version, datos) {
       return peticion('/api/estado', { metodo: 'PUT', cuerpo: { version: version, datos: datos } });
+    },
+    listarUsuarios: function () { return peticion('/api/usuarios'); },
+    darAcceso: function (correo) {
+      return peticion('/api/usuarios', { metodo: 'POST', cuerpo: { correo: correo } });
+    },
+    quitarAcceso: function (correo) {
+      return peticion('/api/usuarios', { metodo: 'DELETE', cuerpo: { correo: correo } });
     }
   };
 })(window.App = window.App || {});

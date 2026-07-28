@@ -612,3 +612,15 @@ tfoot td {
 .ficha-usuario .silencio {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* ---------- Usuarios con acceso ---------- */
+
+.fila-usuario {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--outline);
+  border-radius: var(--radio);
+  background: var(--surface-low);
+}
+.fila-usuario:not(:last-child) { margin-bottom: 8px; }
+.fila-usuario .crece { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

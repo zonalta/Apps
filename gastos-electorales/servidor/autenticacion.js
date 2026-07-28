@@ -6,16 +6,10 @@
 'use strict';
 
 const { OAuth2Client } = require('google-auth-library');
+const usuarios = require('./usuarios');
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const MODO = (process.env.AUTH_MODO || 'google').toLowerCase();
-
-/* Correos con permiso, separados por comas. Se normalizan a minúsculas porque
-   Google los devuelve así y evita fallos por mayúsculas al configurarlos. */
-const AUTORIZADOS = (process.env.CORREOS_AUTORIZADOS || '')
-  .split(',')
-  .map((c) => c.trim().toLowerCase())
-  .filter(Boolean);
 
 /* Interlocking de seguridad: el modo de desarrollo salta la verificación, así
    que no puede convivir con Cloud Run bajo ningún concepto. K_SERVICE sólo
@@ -29,12 +23,12 @@ const cliente = new OAuth2Client(CLIENT_ID);
 
 function configurado() {
   if (MODO === 'desarrollo') { return true; }
-  return Boolean(CLIENT_ID) && AUTORIZADOS.length > 0;
+  return Boolean(CLIENT_ID) && usuarios.ADMINISTRADORES.length > 0;
 }
 
 function motivoSinConfigurar() {
   if (!CLIENT_ID) { return 'Falta la variable GOOGLE_CLIENT_ID en el servicio.'; }
-  if (!AUTORIZADOS.length) { return 'Falta la variable CORREOS_AUTORIZADOS en el servicio.'; }
+  if (!usuarios.ADMINISTRADORES.length) { return 'Falta la variable CORREOS_AUTORIZADOS en el servicio.'; }
   return null;
 }
 
@@ -49,7 +43,7 @@ function extraerCredencial(req) {
 async function identificar(req) {
   if (MODO === 'desarrollo') {
     console.warn('AUTH_MODO=desarrollo — petición aceptada sin verificar identidad.');
-    return { correo: 'desarrollo@local', nombre: 'Modo desarrollo', foto: null };
+    return { correo: 'desarrollo@local', nombre: 'Modo desarrollo', foto: null, esAdmin: true };
   }
 
   if (!configurado()) {
@@ -87,13 +81,18 @@ async function identificar(req) {
   }
 
   const correo = carga.email.toLowerCase();
-  if (AUTORIZADOS.indexOf(correo) < 0) {
+  if (!(await usuarios.estaAutorizado(correo))) {
     const err = new Error('La cuenta ' + correo + ' no tiene acceso a esta aplicación.');
     err.estado = 403;
     throw err;
   }
 
-  return { correo: correo, nombre: carga.name || correo, foto: carga.picture || null };
+  return {
+    correo: correo,
+    nombre: carga.name || correo,
+    foto: carga.picture || null,
+    esAdmin: usuarios.esAdmin(correo)
+  };
 }
 
 /* Lo que el navegador necesita saber antes de iniciar sesión. El identificador
