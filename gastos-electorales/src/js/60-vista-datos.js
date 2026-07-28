@@ -74,6 +74,68 @@
       });
   }
 
+  /* El resultado de la última importación de cada fuente vive fuera del DOM: si
+     se guardase en el nodo, el repintado que sigue a la carga se lo llevaría por
+     delante y los avisos no llegarían a leerse. */
+  var ultimaCarga = {};
+
+  function avisosDeCarga(fuente) {
+    var estado = ultimaCarga[fuente.id];
+    var bloque = el('div', { class: 'apilar junto', style: 'width:100%;margin-top:14px' });
+    if (!estado) { return bloque; }
+
+    if (estado.leyendo) {
+      bloque.appendChild(el('p', { class: 'silencio', text: 'Leyendo ' + estado.fichero + '…' }));
+      return bloque;
+    }
+
+    if (estado.error) {
+      bloque.appendChild(el('div', { class: 'aviso error' }, [
+        icono('aviso'), el('div', { text: estado.error })
+      ]));
+      return bloque;
+    }
+
+    var res = estado.res;
+
+    if (res.noReconocidos.length) {
+      var muestra = res.noReconocidos.slice(0, 6).join(', ');
+      bloque.appendChild(el('div', { class: 'aviso' }, [
+        icono('aviso'),
+        el('div', {}, [
+          el('strong', { text: res.noReconocidos.length + ' fila(s) sin municipio reconocible. ' }),
+          'Se han ignorado: ' + muestra + (res.noReconocidos.length > 6 ? '…' : '')
+        ])
+      ]));
+    }
+
+    /* Código y nombre que no concuerdan: los datos se han importado por código,
+       pero conviene mirarlo antes de fiarse del informe. */
+    if (res.discrepancias.length) {
+      bloque.appendChild(el('div', { class: 'aviso error' }, [
+        icono('aviso'),
+        el('div', {}, [
+          el('strong', {
+            text: res.discrepancias.length + ' fila(s) con el código y el nombre en desacuerdo. '
+          }),
+          'Los datos se han importado usando el código. Revise si el fichero sigue otra codificación:',
+          el('ul', { style: 'margin:8px 0 0;padding-left:20px' },
+            res.discrepancias.slice(0, 5).map(function (d) {
+              return el('li', {
+                text: '«' + d.texto + '» — el código ' + d.codigo + ' corresponde a ' + d.nombreEsperado
+              });
+            })
+          ),
+          res.discrepancias.length > 5
+            ? el('p', { style: 'margin-top:6px', text: 'y ' + (res.discrepancias.length - 5) + ' más.' })
+            : null
+        ])
+      ]));
+    }
+
+    return bloque;
+  }
+
   function zonaCarga(fuente) {
     var input = el('input', {
       type: 'file',
@@ -84,29 +146,17 @@
       }
     });
 
-    var mensaje = el('div', { class: 'apilar junto', style: 'width:100%' });
-
     function manejar(file) {
-      App.ui.vaciar(mensaje);
-      mensaje.appendChild(el('p', { class: 'silencio', text: 'Leyendo ' + file.name + '…' }));
+      ultimaCarga[fuente.id] = { leyendo: true, fichero: file.name };
+      App.render();
 
       procesar(fuente, file, function (err, res) {
-        App.ui.vaciar(mensaje);
         if (err) {
-          mensaje.appendChild(el('div', { class: 'aviso error' }, [icono('aviso'), el('div', { text: err.message })]));
+          ultimaCarga[fuente.id] = { error: err.message, fichero: file.name };
           App.ui.flotante('No se pudo importar ' + file.name, true);
-          return;
-        }
-        App.ui.flotante(res.filasImportadas + ' municipios importados en «' + fuente.titulo + '»');
-        if (res.noReconocidos.length) {
-          var muestra = res.noReconocidos.slice(0, 6).join(', ');
-          mensaje.appendChild(el('div', { class: 'aviso' }, [
-            icono('aviso'),
-            el('div', {}, [
-              el('strong', { text: res.noReconocidos.length + ' fila(s) sin municipio reconocible. ' }),
-              'Se han ignorado: ' + muestra + (res.noReconocidos.length > 6 ? '…' : '')
-            ])
-          ]));
+        } else {
+          ultimaCarga[fuente.id] = { res: res, fichero: file.name };
+          App.ui.flotante(res.filasImportadas + ' municipios importados en «' + fuente.titulo + '»');
         }
         App.render();
       });
@@ -143,7 +193,7 @@
       el('p', { class: 'silencio', text: fuente.descripcion }),
       el('p', { class: 'silencio', style: 'margin-top:6px', text: 'Formato esperado — ' + fuente.formato }),
       el('div', { style: 'margin-top:18px' }, [zona]),
-      mensaje
+      avisosDeCarga(fuente)
     ]);
   }
 

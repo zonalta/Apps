@@ -80,10 +80,15 @@ Estas son interpretaciones, no hechos: conviene confirmarlas.
 4. **Miembros por mesa.** Fijado en 3 según el briefing, pero configurable, por
    si cambia entre convocatorias.
 
-5. **Códigos de municipio.** Son los del INE, escritos de memoria. Antes de usar
-   la aplicación en producción conviene contrastarlos con la fuente oficial,
-   sobre todo `38901` (El Pinar de El Hierro), que se creó en 2007 y por eso
-   rompe la numeración correlativa.
+5. **Códigos de municipio.** Verificados uno a uno contra el fichero oficial
+   *Municipios Canarias enero 2025 (INE)*. Los 88 coinciden en código, nombre e
+   isla. Los identificadores de isla son los `CISLA` del propio INE (351
+   Fuerteventura, 352 Gran Canaria, 353 Lanzarote, 381 La Gomera, 382 El Hierro,
+   383 La Palma, 384 Tenerife), no códigos inventados.
+
+   La tabla se regenera desde el Excel del INE, no se edita a mano. Cuando el
+   INE publique una revisión, hay que volver a generarla desde la fuente en vez
+   de parchear entradas sueltas.
 
 ## Formato de los ficheros de carga
 
@@ -97,8 +102,15 @@ MUNICIPIOS;PD0;PD1;PD2;PD3;PD4;PD5
 ```
 
 Desde «Carga de Datos» se descargan las tres plantillas ya rellenas con los 88
-municipios. Las filas cuyo municipio no se reconozca se ignoran y se avisa de
-cuáles han sido.
+municipios.
+
+La importación hace dos comprobaciones y avisa de ambas en pantalla:
+
+- **Municipio no reconocido** — la fila se ignora y se dice cuál era.
+- **Código y nombre en desacuerdo** — cuando la celda trae los dos («35001
+  AGAETE») y no se refieren al mismo municipio. Los datos se importan usando el
+  código, pero se avisa: sin este aviso, un fichero con otra codificación
+  colgaría las cifras del municipio equivocado sin que nadie se enterase.
 
 ## Informes
 

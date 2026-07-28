@@ -257,10 +257,11 @@
     return null;
   }
 
-  function resumen(okCount, noReconocidos) {
+  function resumen(okCount, noReconocidos, discrepancias) {
     return {
       filasImportadas: okCount,
-      noReconocidos: noReconocidos
+      noReconocidos: noReconocidos,
+      discrepancias: discrepancias || []
     };
   }
 
@@ -282,6 +283,7 @@
 
     var datos = {};
     var noReconocidos = [];
+    var discrepancias = [];
     var n = 0;
 
     for (var f = inicio; f < filas.length; f++) {
@@ -290,6 +292,8 @@
       if (!String(bruto || '').trim()) { continue; }
       var codigo = App.geo.resolverMunicipio(bruto);
       if (!codigo) { noReconocidos.push(String(bruto).trim()); continue; }
+      var choque = App.geo.discrepancia(bruto, codigo);
+      if (choque) { discrepancias.push(choque); }
 
       var reg = {};
       App.store.TIPOLOGIAS_PD.forEach(function (t) {
@@ -298,7 +302,7 @@
       datos[codigo] = reg;
       n++;
     }
-    return { datos: datos, resumen: resumen(n, noReconocidos) };
+    return { datos: datos, resumen: resumen(n, noReconocidos, discrepancias) };
   }
 
   /* Tablas de una sola magnitud por municipio (mesas, efectivos de policía). */
@@ -316,6 +320,7 @@
 
     var datos = {};
     var noReconocidos = [];
+    var discrepancias = [];
     var n = 0;
 
     for (var f = inicio; f < filas.length; f++) {
@@ -324,10 +329,12 @@
       if (!String(bruto || '').trim()) { continue; }
       var codigo = App.geo.resolverMunicipio(bruto);
       if (!codigo) { noReconocidos.push(String(bruto).trim()); continue; }
+      var choque = App.geo.discrepancia(bruto, codigo);
+      if (choque) { discrepancias.push(choque); }
       datos[codigo] = aNumero(fila[colValor]);
       n++;
     }
-    return { datos: datos, resumen: resumen(n, noReconocidos) };
+    return { datos: datos, resumen: resumen(n, noReconocidos, discrepancias) };
   }
 
   App.parsers = {
