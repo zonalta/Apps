@@ -1534,6 +1534,7 @@ tfoot td {
     escudo: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
     mesa: 'M3 10h18 M5 10V6a2 2 0 012-2h10a2 2 0 012 2v4 M6 10v10 M18 10v10 M9 14h6',
     tableta: 'M5 2h14a1 1 0 011 1v18a1 1 0 01-1 1H5a1 1 0 01-1-1V3a1 1 0 011-1z M12 18h.01',
+    papelera: 'M3 6h18 M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2 M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6 M10 11v6 M14 11v6',
     refrescar: 'M23 4v6h-6 M1 20v-6h6 M3.51 9a9 9 0 0114.85-3.36L23 10 M1 14l4.64 4.36A9 9 0 0020.49 15'
   };
 
@@ -1873,7 +1874,8 @@ tfoot td {
       descripcion: 'Número de mesas electorales de cada municipio. Es el dato del que dependen casi todos los cálculos.',
       formato: 'Dos columnas: municipio (código INE, nombre o "35001 AGAETE") y número de mesas.',
       interpretar: 'interpretarMesas',
-      aplicar: function (s, datos) { s.mesas = datos; }
+      aplicar: function (s, datos) { s.mesas = datos; },
+      limpiar: function (s) { s.mesas = {}; }
     },
     {
       id: 'representantes',
@@ -1882,7 +1884,8 @@ tfoot td {
       descripcion: 'Número de representantes de la Administración de cada municipio, desglosado por tipología PD0 a PD5.',
       formato: 'Cabecera con MUNICIPIOS | PD0 | PD1 | PD2 | PD3 | PD4 | PD5 (la columna TOTAL, si existe, se ignora).',
       interpretar: 'interpretarRepresentantes',
-      aplicar: function (s, datos) { s.representantes = datos; }
+      aplicar: function (s, datos) { s.representantes = datos; },
+      limpiar: function (s) { s.representantes = {}; }
     },
     {
       id: 'policia',
@@ -1891,21 +1894,59 @@ tfoot td {
       descripcion: 'Efectivos de Policía Autonómica y Local asignados a cada municipio.',
       formato: 'Dos columnas: municipio y número de efectivos.',
       interpretar: 'interpretarPolicia',
-      aplicar: function (s, datos) { s.policia = datos; }
+      aplicar: function (s, datos) { s.policia = datos; },
+      limpiar: function (s) { s.policia = {}; }
     }
   ];
 
-  function resumenCarga(id) {
-    var carga = App.store.estado().cargas[id];
-    if (!carga) {
+  /* Cuántos municipios tiene cargados una fuente ahora mismo. Se cuenta sobre los
+     datos, no sobre el registro de la carga: así el chip dice la verdad aunque el
+     estado se haya restaurado desde una copia antigua. */
+  function cuantosDatos(fuenteId) {
+    var s = App.store.estado();
+    var mapa = fuenteId === 'mesas' ? s.mesas
+      : fuenteId === 'representantes' ? s.representantes
+        : s.policia;
+    return Object.keys(mapa || {}).length;
+  }
+
+  function borrarFuente(fuente) {
+    var n = cuantosDatos(fuente.id);
+    if (!window.confirm(
+      'Se borrarán los datos de «' + fuente.titulo + '» (' + n + ' municipios).\n\n' +
+      'Las tarifas de la configuración no se tocan.\n¿Continuar?'
+    )) { return; }
+
+    App.store.muta(function (s) {
+      fuente.limpiar(s);
+      delete s.cargas[fuente.id];
+    });
+    delete ultimaCarga[fuente.id];
+    App.ui.flotante('Datos de «' + fuente.titulo + '» borrados');
+    App.render();
+  }
+
+  function resumenCarga(fuente) {
+    var carga = App.store.estado().cargas[fuente.id];
+    var n = cuantosDatos(fuente.id);
+
+    if (!n) {
       return el('span', { class: 'chip pendiente', text: 'Sin datos cargados' });
     }
+
     return el('div', { class: 'fila' }, [
-      el('span', { class: 'chip ok' }, [icono('check', 13), App.ui.numero(carga.filas) + ' municipios']),
-      el('span', {
-        class: 'silencio',
-        text: carga.fichero + ' · ' + App.ui.fecha(new Date(carga.fecha))
-      })
+      el('span', { class: 'chip ok' }, [icono('check', 13), App.ui.numero(n) + ' municipios']),
+      carga
+        ? el('span', {
+            class: 'silencio',
+            text: carga.fichero + ' · ' + App.ui.fecha(new Date(carga.fecha))
+          })
+        : null,
+      el('button', {
+        class: 'btn peligro pequeno',
+        title: 'Borrar los datos de ' + fuente.titulo,
+        onClick: function () { borrarFuente(fuente); }
+      }, [icono('papelera', 14), 'Borrar'])
     ]);
   }
 
@@ -2048,7 +2089,7 @@ tfoot td {
     return el('section', { class: 'tarjeta' }, [
       el('header', {}, [
         el('h2', {}, [icono(fuente.icono), fuente.titulo]),
-        resumenCarga(fuente.id)
+        resumenCarga(fuente)
       ]),
       el('p', { class: 'silencio', text: fuente.descripcion }),
       el('p', { class: 'silencio', style: 'margin-top:6px', text: 'Formato esperado — ' + fuente.formato }),
@@ -2159,56 +2200,114 @@ tfoot td {
     App.ui.flotante('Descargando las tres plantillas con los 88 municipios');
   }
 
-  function tarjetaMantenimiento() {
+  function nombreCopia() {
+    var conv = App.store.estado().convocatoria || 'proceso';
+    var limpio = App.geo.normaliza(conv).replace(/ /g, '-') || 'proceso';
+    return 'gastos-' + limpio + '-' + new Date().toISOString().slice(0, 10) + '.json';
+  }
+
+  function exportarCopia() {
+    App.ui.descargar(nombreCopia(), JSON.stringify(App.store.exportar(), null, 2), 'application/json');
+  }
+
+  function botonRestaurar() {
+    var input = el('input', {
+      type: 'file', accept: '.json', style: 'display:none',
+      onChange: function (e) {
+        var f = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (!f) { return; }
+        f.text().then(function (txt) {
+          App.store.importar(JSON.parse(txt));
+          App.ui.flotante('Copia restaurada');
+          App.render();
+        }).catch(function () {
+          App.ui.flotante('El fichero no es una copia válida', true);
+        });
+      }
+    });
+    return el('span', {}, [
+      el('button', {
+        class: 'btn secundario',
+        onClick: function () { input.click(); }
+      }, [icono('carga', 16), 'Restaurar copia']),
+      input
+    ]);
+  }
+
+  function hayDatos() {
+    return FUENTES.some(function (f) { return cuantosDatos(f.id) > 0; });
+  }
+
+  /* Vaciar los datos sin tocar las tarifas: es el gesto de cerrar una
+     convocatoria y abrir la siguiente, donde los censos cambian enteros pero los
+     importes se suelen retocar, no rehacer. */
+  function borrarTodosLosDatos() {
+    var detalle = FUENTES
+      .filter(function (f) { return cuantosDatos(f.id) > 0; })
+      .map(function (f) { return '· ' + f.titulo + ': ' + cuantosDatos(f.id) + ' municipios'; })
+      .join('\n');
+
+    if (!window.confirm(
+      'Se borrarán todos los censos cargados:\n\n' + detalle + '\n\n' +
+      'Las tarifas de la configuración se conservan.\n\n' +
+      'Si aún no ha exportado una copia de esta convocatoria, cancele y expórtela primero.\n¿Continuar?'
+    )) { return; }
+
+    App.store.muta(function (s) {
+      FUENTES.forEach(function (f) { f.limpiar(s); });
+      s.cargas = {};
+    });
+    FUENTES.forEach(function (f) { delete ultimaCarga[f.id]; });
+    App.ui.flotante('Censos borrados. Las tarifas siguen configuradas.');
+    App.render();
+  }
+
+  function tarjetaConvocatoria() {
+    var estado = App.store.estado();
     return el('section', { class: 'tarjeta' }, [
-      el('header', {}, [el('h2', {}, [icono('refrescar'), 'Copia de seguridad'])]),
+      el('header', {}, [
+        el('h2', {}, [icono('refrescar'), 'Cambio de convocatoria']),
+        hayDatos()
+          ? el('span', { class: 'chip ok', text: estado.convocatoria })
+          : el('span', { class: 'chip pendiente', text: 'Sin censos cargados' })
+      ]),
       el('p', {
         class: 'silencio',
-        text: 'Los datos se guardan en este navegador. Exporte una copia para llevársela a otro dispositivo mientras la aplicación no tenga servidor.'
+        text: 'Para reutilizar la herramienta en otro proceso electoral: exporte una copia de la convocatoria actual, borre los censos y cargue los nuevos. Las tarifas se mantienen para que sólo tenga que retocar lo que haya cambiado.'
       }),
+
       el('div', { class: 'fila', style: 'margin-top:18px' }, [
-        el('button', {
-          class: 'btn secundario',
-          onClick: function () {
-            App.ui.descargar(
-              'gastos-electorales-' + new Date().toISOString().slice(0, 10) + '.json',
-              JSON.stringify(App.store.exportar(), null, 2),
-              'application/json'
-            );
-          }
-        }, [icono('descarga', 16), 'Exportar copia (JSON)']),
-        (function () {
-          var input = el('input', {
-            type: 'file', accept: '.json', style: 'display:none',
-            onChange: function (e) {
-              var f = e.target.files && e.target.files[0];
-              e.target.value = '';
-              if (!f) { return; }
-              f.text().then(function (txt) {
-                App.store.importar(JSON.parse(txt));
-                App.ui.flotante('Copia restaurada');
-                App.render();
-              }).catch(function () {
-                App.ui.flotante('El fichero no es una copia válida', true);
-              });
-            }
-          });
-          var boton = el('button', {
-            class: 'btn secundario',
-            onClick: function () { input.click(); }
-          }, [icono('carga', 16), 'Restaurar copia']);
-          return el('span', {}, [boton, input]);
-        })(),
+        el('button', { class: 'btn secundario', onClick: exportarCopia },
+          [icono('descarga', 16), 'Exportar copia (JSON)']),
+        botonRestaurar(),
         el('button', {
           class: 'btn peligro',
+          disabled: !hayDatos(),
+          onClick: borrarTodosLosDatos
+        }, [icono('papelera', 16), 'Borrar todos los censos'])
+      ]),
+
+      el('p', {
+        class: 'leyenda-nota',
+        text: 'La copia en JSON guarda las tarifas y los tres censos de la convocatoria. Restaurarla devuelve ese proceso tal y como estaba, así que sirve para volver a 2023 después de haber trabajado en 2027.'
+      }),
+
+      el('div', { class: 'fila', style: 'margin-top:14px' }, [
+        el('button', {
+          class: 'btn fantasma pequeno',
           onClick: function () {
-            if (window.confirm('Se borrarán las tarifas y todos los datos cargados. ¿Continuar?')) {
+            if (window.confirm(
+              'Se borrarán las tarifas Y todos los censos, dejando la aplicación como recién instalada.\n\n' +
+              '¿Continuar?'
+            )) {
               App.store.reiniciar();
-              App.ui.flotante('Configuración y datos reiniciados');
+              FUENTES.forEach(function (f) { delete ultimaCarga[f.id]; });
+              App.ui.flotante('Aplicación reiniciada por completo');
               App.render();
             }
           }
-        }, 'Borrar todo')
+        }, 'Reiniciar también las tarifas')
       ])
     ]);
   }
@@ -2221,7 +2320,7 @@ tfoot td {
       return el('div', { class: 'apilar', style: 'gap:24px' }, [
         el('div', { class: 'rejilla tres' }, FUENTES.map(zonaCarga)),
         tablaEstadoDatos(),
-        tarjetaMantenimiento()
+        tarjetaConvocatoria()
       ]);
     }
   };

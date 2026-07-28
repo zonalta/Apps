@@ -112,6 +112,26 @@ La importación hace dos comprobaciones y avisa de ambas en pantalla:
   código, pero se avisa: sin este aviso, un fichero con otra codificación
   colgaría las cifras del municipio equivocado sin que nadie se enterase.
 
+## Reutilizar la herramienta en otra convocatoria
+
+Los censos (mesas, representantes, policía) cambian enteros de un proceso a otro;
+las tarifas se suelen retocar, no rehacer. El borrado respeta esa diferencia:
+
+| Acción | Dónde | Qué borra |
+|---|---|---|
+| «Borrar» en una tarjeta | Cabecera de cada fuente | Sólo ese censo |
+| «Borrar todos los censos» | Cambio de convocatoria | Los tres censos. **Las tarifas se conservan** |
+| «Reiniciar también las tarifas» | Cambio de convocatoria | Todo, como recién instalada |
+
+El ciclo previsto para pasar de 2023 a 2027 es: exportar la copia JSON de 2023 →
+borrar todos los censos → cambiar el nombre de la convocatoria → cargar los
+ficheros nuevos. Restaurar la copia de 2023 devuelve ese proceso tal y como
+estaba, así que se puede ir y volver entre convocatorias.
+
+Mientras no haya servidor sólo hay **una convocatoria viva a la vez**; las demás
+viven en sus ficheros JSON. Manejar varias a la vez dentro de la aplicación es
+trabajo pendiente, y encaja mejor cuando exista el backend.
+
 ## Informes
 
 Los filtros de provincia, isla, municipio y tipología son listas de casillas
@@ -129,3 +149,5 @@ impresión con una hoja preparada: título, convocatoria, fecha de generación,
 - Colegios electorales como nivel entre municipio y mesa; con ellos, los
   coordinadores de tablets dejarían de ser un importe suelto.
 - Historial de informes generados.
+- Varias convocatorias vivas a la vez dentro de la aplicación, en vez de una
+  activa y el resto en ficheros JSON.
