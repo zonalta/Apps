@@ -482,3 +482,28 @@ tfoot td {
 .cabecera-impresion { margin-bottom: 18px; }
 .cabecera-impresion h1 { font-size: 20pt; color: var(--primary); }
 .cabecera-impresion .meta { color: var(--on-surface-variant); font-size: 10pt; margin-top: 4px; }
+
+/* ---------- Carga de datos ---------- */
+
+.zona-carga.grande { padding: 40px 24px; }
+.zona-carga.grande h3 { font-size: 17px; max-width: 30ch; }
+
+.columna-reconocida { display: flex; flex-direction: column; gap: 6px; }
+.columna-reconocida .fila { gap: 8px; color: var(--primary); }
+.cabecera-esperada {
+  display: inline-block; align-self: flex-start;
+  padding: 3px 8px; border-radius: var(--radio);
+  background: var(--surface-container);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; letter-spacing: 0.02em;
+  color: var(--on-surface-variant);
+}
+
+.ficha-censo {
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
+  padding: 16px;
+  border: 1px solid var(--outline);
+  border-radius: var(--radio);
+  background: var(--surface-low);
+}
+.ficha-censo .entre { width: 100%; }

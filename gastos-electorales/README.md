@@ -36,7 +36,7 @@ No hay dependencias ni `node_modules`: `build.js` sólo concatena `src/`.
 | `src/js/30-calc.js` | Motor de cálculo — **todo el dinero se calcula aquí** |
 | `src/js/40-ui.js` | Formato, construcción de nodos y gráficas de barras |
 | `src/js/50-vista-config.js` | Configuración de importes |
-| `src/js/60-vista-datos.js` | Carga de ficheros y copia de seguridad |
+| `src/js/60-vista-datos.js` | Carga de ficheros, estado de los censos y copia de seguridad |
 | `src/js/70-vista-dashboard.js` | Filtros, indicadores, gráficas y tablas |
 | `src/js/90-app.js` | Navegación y arranque |
 
@@ -93,24 +93,50 @@ Estas son interpretaciones, no hechos: conviene confirmarlas.
 ## Formato de los ficheros de carga
 
 Se acepta CSV (con `;`, `,` o tabulador) y Excel `.xlsx`. El `.xls` antiguo no.
-El municipio se reconoce por código (`35001`), por nombre (`AGAETE`), por ambos
-(`35001 AGAETE`) y con el artículo en cualquier posición (`La Oliva` u `Oliva, La`).
+
+Hay **una sola zona de carga**: el fichero se examina por su cabecera y se importa
+todo censo que contenga. Un mismo Excel puede alimentar varios a la vez.
+
+| Censo | Columnas que lo activan |
+|---|---|
+| Mesas | `MESAS` |
+| Representantes | `PD0` `PD1` `PD2` `PD3` `PD4` `PD5` (las seis) |
+| Efectivos de policía | `EFECTIVOS` |
+
+La columna de municipios debe llamarse `MUNICIPIOS` (o `CÓDIGO` / `NOMBRE`) y
+admite `35001`, `AGAETE` o `35001 AGAETE`, con el artículo en cualquier posición
+(`La Oliva`, `Oliva, La`, `OLIVA (LA)`).
 
 ```
-MUNICIPIOS;PD0;PD1;PD2;PD3;PD4;PD5
-35001 AGAETE;5;2;2;0;1;0
+MUNICIPIOS;PD0;PD1;PD2;PD3;PD4;PD5;MESAS
+35001 AGAETE;5;2;2;0;1;0;10
+TOTALES;986;114;140;184;82;58;1564
 ```
 
-Desde «Carga de Datos» se descargan las tres plantillas ya rellenas con los 88
-municipios.
+**La carga fusiona, no reemplaza.** Los municipios del fichero se actualizan y el
+resto se conserva, de modo que se puede cargar una provincia hoy y la otra mañana.
+Para empezar de cero está el botón de borrar de cada censo.
 
-La importación hace dos comprobaciones y avisa de ambas en pantalla:
+### Comprobaciones de la importación
 
-- **Municipio no reconocido** — la fila se ignora y se dice cuál era.
-- **Código y nombre en desacuerdo** — cuando la celda trae los dos («35001
-  AGAETE») y no se refieren al mismo municipio. Los datos se importan usando el
-  código, pero se avisa: sin este aviso, un fichero con otra codificación
-  colgaría las cifras del municipio equivocado sin que nadie se enterase.
+Cuatro, todas visibles en pantalla tras cargar:
+
+1. **Fila de totales** — si el fichero trae una fila `TOTALES`, se contrasta
+   columna a columna contra la suma de las filas importadas. Detecta ficheros
+   truncados o mal leídos.
+2. **Representantes frente a mesas** — cuando ambos censos llegan en el mismo
+   fichero se comprueba si ΣPD0…PD5 iguala a `MESAS`. En los datos reales se
+   cumple en todos los municipios (un representante por mesa), pero no se impone
+   como regla: sólo se informa de las diferencias.
+3. **Municipio no reconocido** — la fila se ignora y se dice cuál era. Las filas
+   de totales no cuentan como error: se detectan y se apartan.
+4. **Código y nombre en desacuerdo** — cuando la celda trae los dos y no se
+   refieren al mismo municipio. Los datos se importan usando el código, pero se
+   avisa: sin este aviso, un fichero con otra codificación colgaría las cifras
+   del municipio equivocado sin que nadie se enterase.
+
+Desde «Carga de Datos» se descargan dos plantillas con los 88 municipios: la
+combinada de representantes y mesas, y la de policía.
 
 ## Reutilizar la herramienta en otra convocatoria
 

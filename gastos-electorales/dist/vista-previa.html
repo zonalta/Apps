@@ -485,6 +485,31 @@ tfoot td {
 .cabecera-impresion h1 { font-size: 20pt; color: var(--primary); }
 .cabecera-impresion .meta { color: var(--on-surface-variant); font-size: 10pt; margin-top: 4px; }
 
+/* ---------- Carga de datos ---------- */
+
+.zona-carga.grande { padding: 40px 24px; }
+.zona-carga.grande h3 { font-size: 17px; max-width: 30ch; }
+
+.columna-reconocida { display: flex; flex-direction: column; gap: 6px; }
+.columna-reconocida .fila { gap: 8px; color: var(--primary); }
+.cabecera-esperada {
+  display: inline-block; align-self: flex-start;
+  padding: 3px 8px; border-radius: var(--radio);
+  background: var(--surface-container);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; letter-spacing: 0.02em;
+  color: var(--on-surface-variant);
+}
+
+.ficha-censo {
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
+  padding: 16px;
+  border: 1px solid var(--outline);
+  border-radius: var(--radio);
+  background: var(--surface-low);
+}
+.ficha-censo .entre { width: 100%; }
+
 </style>
 <div id="app" class="app"></div>
 <script>
@@ -1101,101 +1126,197 @@ tfoot td {
     return isNaN(n) ? 0 : n;
   }
 
-  /* Busca la fila de cabecera: la primera cuyas celdas casen con alguno de los
-     patrones dados. Devuelve { indice, columnas } o null. */
-  function localizarCabecera(filas, patrones) {
+  /* Un fichero de datos puede traer varios censos a la vez. Cada bloque se
+     reconoce por su cabecera, de modo que un único Excel con
+     MUNICIPIOS | PD0..PD5 | MESAS alimenta representantes y mesas en una sola
+     carga, y un fichero de dos columnas sigue funcionando igual. */
+  var BLOQUES = [
+    {
+      id: 'representantes',
+      nombre: 'Representantes de la Administración',
+      columnas: App.store.TIPOLOGIAS_PD.map(function (t) {
+        return { clave: t, patron: new RegExp('^' + t.toLowerCase().replace('pd', 'pd\\s*') + '$') };
+      }),
+      /* Varias columnas: el valor de cada municipio es un objeto PD0..PD5. */
+      leer: function (fila, cols) {
+        var reg = {};
+        App.store.TIPOLOGIAS_PD.forEach(function (t) {
+          reg[t] = aNumero(fila[cols[t]]);
+        });
+        return reg;
+      },
+      sumar: function (acc, v) {
+        App.store.TIPOLOGIAS_PD.forEach(function (t) { acc[t] = (acc[t] || 0) + v[t]; });
+        return acc;
+      },
+      vacio: function () { return {}; }
+    },
+    {
+      id: 'mesas',
+      nombre: 'Mesas electorales',
+      columnas: [{ clave: 'mesas', patron: /^(mesas|n mesas|no mesas|num mesas|numero de mesas|total mesas|mesas electorales)$/ }],
+      leer: function (fila, cols) { return aNumero(fila[cols.mesas]); },
+      sumar: function (acc, v) { return acc + v; },
+      vacio: function () { return 0; }
+    },
+    {
+      id: 'policia',
+      nombre: 'Efectivos de policía',
+      columnas: [{ clave: 'policia', patron: /^(efectivos|policia|agentes|dotacion|efectivos policia|efectivos de policia)$/ }],
+      leer: function (fila, cols) { return aNumero(fila[cols.policia]); },
+      sumar: function (acc, v) { return acc + v; },
+      vacio: function () { return 0; }
+    }
+  ];
+
+  var PATRON_MUNICIPIO = /^(municipios?|codigo|cod|nombre|termino municipal|ayuntamientos?)$/;
+  var PATRON_TOTALES = /^(total|totales|suma|sumas|total general)/;
+
+  /* Localiza la fila de cabecera y el índice de cada columna conocida. Se miran
+     las 20 primeras filas porque estos ficheros suelen llevar título encima. */
+  function localizarCabecera(filas) {
     for (var f = 0; f < Math.min(filas.length, 20); f++) {
-      var columnas = {};
+      var cols = {};
+      var municipio = -1;
+
       filas[f].forEach(function (celda, c) {
         var txt = App.geo.normaliza(celda);
-        Object.keys(patrones).forEach(function (clave) {
-          if (columnas[clave] !== undefined) { return; }
-          if (patrones[clave].test(txt)) { columnas[clave] = c; }
+        if (!txt) { return; }
+        if (municipio < 0 && PATRON_MUNICIPIO.test(txt)) { municipio = c; return; }
+        BLOQUES.forEach(function (b) {
+          b.columnas.forEach(function (col) {
+            if (cols[col.clave] === undefined && col.patron.test(txt)) { cols[col.clave] = c; }
+          });
         });
       });
-      if (columnas.municipio !== undefined) { return { indice: f, columnas: columnas }; }
+
+      if (municipio >= 0) { return { indice: f, municipio: municipio, columnas: cols }; }
     }
     return null;
   }
 
-  function resumen(okCount, noReconocidos, discrepancias) {
-    return {
-      filasImportadas: okCount,
-      noReconocidos: noReconocidos,
-      discrepancias: discrepancias || []
-    };
+  /* Un bloque está presente cuando aparecen todas sus columnas. Media tabla de
+     representantes (sólo PD0 y PD3, por ejemplo) es más probable que sea un
+     error del fichero que una carga parcial deliberada, así que no se importa. */
+  function bloquesPresentes(columnas) {
+    return BLOQUES.filter(function (b) {
+      return b.columnas.every(function (col) { return columnas[col.clave] !== undefined; });
+    });
   }
 
-  /* Representantes: MUNICIPIO | PD0 | PD1 | ... | PD5 [| TOTAL] */
-  function interpretarRepresentantes(filas) {
-    var patrones = { municipio: /^(municipios?|codigo|cod|nombre)$/ };
-    App.store.TIPOLOGIAS_PD.forEach(function (t) {
-      patrones[t] = new RegExp('^' + t.toLowerCase() + '$');
+  function interpretarFicheroDatos(filas) {
+    var cab = localizarCabecera(filas);
+    if (!cab) {
+      throw new Error('No se encontró la columna de municipios. La cabecera debe incluir ' +
+        'MUNICIPIOS (o CÓDIGO / NOMBRE) y al menos una de: PD0…PD5, MESAS o EFECTIVOS.');
+    }
+
+    var presentes = bloquesPresentes(cab.columnas);
+    if (!presentes.length) {
+      throw new Error('Se reconoció la columna de municipios pero ningún dato. ' +
+        'Se esperaba PD0…PD5 (representantes), MESAS o EFECTIVOS.');
+    }
+
+    var resultado = {};
+    var sumas = {};
+    presentes.forEach(function (b) {
+      resultado[b.id] = {};
+      sumas[b.id] = b.vacio();
     });
 
-    var cab = localizarCabecera(filas, patrones);
-    /* Sin cabecera reconocible se asume el orden del briefing: municipio + 6 PD. */
-    var colMunicipio = cab ? cab.columnas.municipio : 0;
-    var inicio = cab ? cab.indice + 1 : 0;
-    var colsPD = {};
-    App.store.TIPOLOGIAS_PD.forEach(function (t, i) {
-      colsPD[t] = (cab && cab.columnas[t] !== undefined) ? cab.columnas[t] : (colMunicipio + 1 + i);
-    });
-
-    var datos = {};
     var noReconocidos = [];
     var discrepancias = [];
-    var n = 0;
+    var filaTotales = null;
 
-    for (var f = inicio; f < filas.length; f++) {
+    for (var f = cab.indice + 1; f < filas.length; f++) {
       var fila = filas[f];
-      var bruto = fila[colMunicipio];
-      if (!String(bruto || '').trim()) { continue; }
-      var codigo = App.geo.resolverMunicipio(bruto);
-      if (!codigo) { noReconocidos.push(String(bruto).trim()); continue; }
-      var choque = App.geo.discrepancia(bruto, codigo);
+      var bruto = fila[cab.municipio];
+      var texto = String(bruto == null ? '' : bruto).trim();
+      if (!texto) { continue; }
+
+      var codigo = App.geo.resolverMunicipio(texto);
+
+      /* La fila de totales del fichero no es un municipio: se guarda aparte y
+         luego sirve para comprobar que lo importado cuadra con lo declarado. */
+      if (!codigo && PATRON_TOTALES.test(App.geo.normaliza(texto))) {
+        filaTotales = fila;
+        continue;
+      }
+      if (!codigo) { noReconocidos.push(texto); continue; }
+
+      var choque = App.geo.discrepancia(texto, codigo);
       if (choque) { discrepancias.push(choque); }
 
-      var reg = {};
-      App.store.TIPOLOGIAS_PD.forEach(function (t) {
-        reg[t] = aNumero(fila[colsPD[t]]);
+      presentes.forEach(function (b) {
+        var valor = b.leer(fila, cab.columnas);
+        resultado[b.id][codigo] = valor;
+        sumas[b.id] = b.sumar(sumas[b.id], valor);
       });
-      datos[codigo] = reg;
-      n++;
     }
-    return { datos: datos, resumen: resumen(n, noReconocidos, discrepancias) };
-  }
 
-  /* Tablas de una sola magnitud por municipio (mesas, efectivos de policía). */
-  function interpretarValorPorMunicipio(filas, patronValor) {
-    var cab = localizarCabecera(filas, {
-      municipio: /^(municipios?|codigo|cod|nombre)$/,
-      valor: patronValor
-    });
-
-    var colMunicipio = cab ? cab.columnas.municipio : 0;
-    var colValor = (cab && cab.columnas.valor !== undefined)
-      ? cab.columnas.valor
-      : colMunicipio + 1;
-    var inicio = cab ? cab.indice + 1 : 0;
-
-    var datos = {};
-    var noReconocidos = [];
-    var discrepancias = [];
-    var n = 0;
-
-    for (var f = inicio; f < filas.length; f++) {
-      var fila = filas[f];
-      var bruto = fila[colMunicipio];
-      if (!String(bruto || '').trim()) { continue; }
-      var codigo = App.geo.resolverMunicipio(bruto);
-      if (!codigo) { noReconocidos.push(String(bruto).trim()); continue; }
-      var choque = App.geo.discrepancia(bruto, codigo);
-      if (choque) { discrepancias.push(choque); }
-      datos[codigo] = aNumero(fila[colValor]);
-      n++;
+    /* Comprobación contra la fila de totales, cuando el fichero la trae. */
+    var comprobacion = null;
+    if (filaTotales) {
+      comprobacion = { cuadra: true, lineas: [] };
+      presentes.forEach(function (b) {
+        b.columnas.forEach(function (col) {
+          var declarado = aNumero(filaTotales[cab.columnas[col.clave]]);
+          var calculado = b.id === 'representantes'
+            ? (sumas[b.id][col.clave] || 0)
+            : sumas[b.id];
+          var cuadra = Math.abs(declarado - calculado) < 0.005;
+          if (!cuadra) { comprobacion.cuadra = false; }
+          comprobacion.lineas.push({
+            columna: col.clave.toUpperCase(),
+            declarado: declarado,
+            calculado: calculado,
+            cuadra: cuadra
+          });
+        });
+      });
     }
-    return { datos: datos, resumen: resumen(n, noReconocidos, discrepancias) };
+
+    /* En los ficheros reales hay un representante por mesa, así que ΣPD0..PD5
+       debería igualar a MESAS. No se impone como regla —puede no cumplirse en
+       otra convocatoria— pero cuando ambos censos vienen en el mismo fichero se
+       contrastan, porque una diferencia suele delatar una fila mal cuadrada. */
+    var repVsMesas = null;
+    if (resultado.representantes && resultado.mesas) {
+      repVsMesas = { coinciden: 0, desajustes: [] };
+      Object.keys(resultado.representantes).forEach(function (codigo) {
+        if (resultado.mesas[codigo] === undefined) { return; }
+        var suma = App.store.TIPOLOGIAS_PD.reduce(function (a, t) {
+          return a + (resultado.representantes[codigo][t] || 0);
+        }, 0);
+        var mesas = resultado.mesas[codigo];
+        if (suma === mesas) {
+          repVsMesas.coinciden += 1;
+        } else {
+          var geo = App.geo.municipio(codigo);
+          repVsMesas.desajustes.push({
+            codigo: codigo,
+            nombre: geo ? geo.nombre : codigo,
+            representantes: suma,
+            mesas: mesas
+          });
+        }
+      });
+    }
+
+    return {
+      bloques: presentes.map(function (b) {
+        return {
+          id: b.id,
+          nombre: b.nombre,
+          datos: resultado[b.id],
+          municipios: Object.keys(resultado[b.id]).length
+        };
+      }),
+      noReconocidos: noReconocidos,
+      discrepancias: discrepancias,
+      comprobacion: comprobacion,
+      repVsMesas: repVsMesas
+    };
   }
 
   App.parsers = {
@@ -1203,13 +1324,8 @@ tfoot td {
     parseXLSX: parseXLSX,
     leerFichero: leerFichero,
     aNumero: aNumero,
-    interpretarRepresentantes: interpretarRepresentantes,
-    interpretarMesas: function (filas) {
-      return interpretarValorPorMunicipio(filas, /(mesas|n mesas|numero de mesas|total mesas)/);
-    },
-    interpretarPolicia: function (filas) {
-      return interpretarValorPorMunicipio(filas, /(efectivos|policia|agentes|dotacion)/);
-    }
+    BLOQUES: BLOQUES,
+    interpretarFicheroDatos: interpretarFicheroDatos
   };
 })(window.App = window.App || {});
 
@@ -1850,161 +1966,288 @@ tfoot td {
 })(window.App = window.App || {});
 
 /* ===== 60-vista-datos.js ===== */
-/* Vista "Carga de Datos": los tres censos que alimentan los cálculos. */
+/* Vista "Carga de Datos": los censos que alimentan los cálculos.
+   Un mismo fichero puede traer varios censos, así que hay una sola zona de carga
+   que detecta por la cabecera qué contiene y actualiza lo que corresponda. */
 (function (App) {
   'use strict';
 
   var el = App.ui.el;
   var icono = App.ui.icono;
 
-  var FUENTES = [
+  var CENSOS = [
     {
       id: 'mesas',
       titulo: 'Mesas por municipio',
       icono: 'mesa',
-      descripcion: 'Número de mesas electorales de cada municipio. Es el dato del que dependen casi todos los cálculos.',
-      formato: 'Dos columnas: municipio (código INE, nombre o "35001 AGAETE") y número de mesas.',
-      interpretar: 'interpretarMesas',
-      aplicar: function (s, datos) { s.mesas = datos; },
-      limpiar: function (s) { s.mesas = {}; }
+      columnas: 'MESAS',
+      descripcion: 'Base de casi todos los cálculos: acondicionamiento, personal, montaje, miembros de mesa y el tramo del secretario.',
+      mapa: function (s) { return s.mesas; },
+      fijar: function (s, m) { s.mesas = m; }
     },
     {
       id: 'representantes',
-      titulo: 'Representantes por municipio',
+      titulo: 'Representantes de la Administración',
       icono: 'grupo',
-      descripcion: 'Número de representantes de la Administración de cada municipio, desglosado por tipología PD0 a PD5.',
-      formato: 'Cabecera con MUNICIPIOS | PD0 | PD1 | PD2 | PD3 | PD4 | PD5 (la columna TOTAL, si existe, se ignora).',
-      interpretar: 'interpretarRepresentantes',
-      aplicar: function (s, datos) { s.representantes = datos; },
-      limpiar: function (s) { s.representantes = {}; }
+      columnas: 'PD0 · PD1 · PD2 · PD3 · PD4 · PD5',
+      descripcion: 'Número de representantes de cada tipología. Cada uno cobra según su tipología.',
+      mapa: function (s) { return s.representantes; },
+      fijar: function (s, m) { s.representantes = m; }
     },
     {
       id: 'policia',
-      titulo: 'Efectivos de policía por municipio',
+      titulo: 'Efectivos de policía',
       icono: 'escudo',
-      descripcion: 'Efectivos de Policía Autonómica y Local asignados a cada municipio.',
-      formato: 'Dos columnas: municipio y número de efectivos.',
-      interpretar: 'interpretarPolicia',
-      aplicar: function (s, datos) { s.policia = datos; },
-      limpiar: function (s) { s.policia = {}; }
+      columnas: 'EFECTIVOS',
+      descripcion: 'Efectivos de Policía Autonómica y Local por municipio. Suele llegar en un fichero aparte.',
+      mapa: function (s) { return s.policia; },
+      fijar: function (s, m) { s.policia = m; }
     }
   ];
 
-  /* Cuántos municipios tiene cargados una fuente ahora mismo. Se cuenta sobre los
-     datos, no sobre el registro de la carga: así el chip dice la verdad aunque el
-     estado se haya restaurado desde una copia antigua. */
-  function cuantosDatos(fuenteId) {
-    var s = App.store.estado();
-    var mapa = fuenteId === 'mesas' ? s.mesas
-      : fuenteId === 'representantes' ? s.representantes
-        : s.policia;
-    return Object.keys(mapa || {}).length;
-  }
-
-  function borrarFuente(fuente) {
-    var n = cuantosDatos(fuente.id);
-    if (!window.confirm(
-      'Se borrarán los datos de «' + fuente.titulo + '» (' + n + ' municipios).\n\n' +
-      'Las tarifas de la configuración no se tocan.\n¿Continuar?'
-    )) { return; }
-
-    App.store.muta(function (s) {
-      fuente.limpiar(s);
-      delete s.cargas[fuente.id];
-    });
-    delete ultimaCarga[fuente.id];
-    App.ui.flotante('Datos de «' + fuente.titulo + '» borrados');
-    App.render();
-  }
-
-  function resumenCarga(fuente) {
-    var carga = App.store.estado().cargas[fuente.id];
-    var n = cuantosDatos(fuente.id);
-
-    if (!n) {
-      return el('span', { class: 'chip pendiente', text: 'Sin datos cargados' });
+  function censo(id) {
+    for (var i = 0; i < CENSOS.length; i++) {
+      if (CENSOS[i].id === id) { return CENSOS[i]; }
     }
-
-    return el('div', { class: 'fila' }, [
-      el('span', { class: 'chip ok' }, [icono('check', 13), App.ui.numero(n) + ' municipios']),
-      carga
-        ? el('span', {
-            class: 'silencio',
-            text: carga.fichero + ' · ' + App.ui.fecha(new Date(carga.fecha))
-          })
-        : null,
-      el('button', {
-        class: 'btn peligro pequeno',
-        title: 'Borrar los datos de ' + fuente.titulo,
-        onClick: function () { borrarFuente(fuente); }
-      }, [icono('papelera', 14), 'Borrar'])
-    ]);
+    return null;
   }
 
-  function procesar(fuente, file, alTerminar) {
+  function cuantos(id) {
+    return Object.keys(censo(id).mapa(App.store.estado()) || {}).length;
+  }
+
+  /* Resultado de la última importación, fuera del DOM: el repintado que sigue a
+     la carga se llevaría por delante cualquier aviso guardado en el nodo. */
+  var ultima = null;
+
+  /* ---------- Importación ---------- */
+
+  function importar(file) {
+    ultima = { leyendo: true, fichero: file.name };
+    App.render();
+
     App.parsers.leerFichero(file)
       .then(function (filas) {
-        var res = App.parsers[fuente.interpretar](filas);
-        var n = Object.keys(res.datos).length;
-        if (!n) {
-          throw new Error('No se reconoció ningún municipio en el fichero. ' +
-            'Revise que la primera columna contenga el código o el nombre del municipio.');
-        }
-        App.store.muta(function (s) {
-          fuente.aplicar(s, res.datos);
-          s.cargas[fuente.id] = {
-            fecha: new Date().toISOString(),
-            fichero: file.name,
-            filas: n
+        var res = App.parsers.interpretarFicheroDatos(filas);
+
+        var resumen = res.bloques.map(function (b) {
+          var previos = censo(b.id).mapa(App.store.estado()) || {};
+          var nuevos = 0;
+          Object.keys(b.datos).forEach(function (c) {
+            if (previos[c] === undefined) { nuevos += 1; }
+          });
+          return {
+            id: b.id, nombre: b.nombre, municipios: b.municipios,
+            nuevos: nuevos, actualizados: b.municipios - nuevos
           };
         });
-        alTerminar(null, res.resumen);
+
+        /* Se fusiona en vez de reemplazar: así un fichero por provincia se puede
+           cargar en dos veces sin que el segundo borre al primero. Para empezar
+           de cero está el botón de borrar de cada censo. */
+        App.store.muta(function (s) {
+          res.bloques.forEach(function (b) {
+            var c = censo(b.id);
+            var mezcla = {};
+            var actual = c.mapa(s) || {};
+            Object.keys(actual).forEach(function (k) { mezcla[k] = actual[k]; });
+            Object.keys(b.datos).forEach(function (k) { mezcla[k] = b.datos[k]; });
+            c.fijar(s, mezcla);
+            s.cargas[b.id] = {
+              fecha: new Date().toISOString(),
+              fichero: file.name,
+              filas: b.municipios
+            };
+          });
+        });
+
+        ultima = { fichero: file.name, res: res, resumen: resumen };
+        App.ui.flotante(
+          resumen.map(function (r) { return r.nombre.toLowerCase(); }).join(' y ') +
+          ' actualizados desde ' + file.name
+        );
+        App.render();
       })
       .catch(function (err) {
         console.error(err);
-        alTerminar(err);
+        ultima = { fichero: file.name, error: err.message };
+        App.ui.flotante('No se pudo importar ' + file.name, true);
+        App.render();
       });
   }
 
-  /* El resultado de la última importación de cada fuente vive fuera del DOM: si
-     se guardase en el nodo, el repintado que sigue a la carga se lo llevaría por
-     delante y los avisos no llegarían a leerse. */
-  var ultimaCarga = {};
+  /* ---------- Zona de carga ---------- */
 
-  function avisosDeCarga(fuente) {
-    var estado = ultimaCarga[fuente.id];
-    var bloque = el('div', { class: 'apilar junto', style: 'width:100%;margin-top:14px' });
-    if (!estado) { return bloque; }
+  function zonaCarga() {
+    var input = el('input', {
+      type: 'file',
+      accept: '.csv,.tsv,.txt,.xlsx',
+      onChange: function (e) {
+        if (e.target.files && e.target.files[0]) { importar(e.target.files[0]); }
+        e.target.value = '';
+      }
+    });
 
-    if (estado.leyendo) {
-      bloque.appendChild(el('p', { class: 'silencio', text: 'Leyendo ' + estado.fichero + '…' }));
-      return bloque;
+    var zona = el('div', {
+      class: 'zona-carga grande',
+      tabindex: '0',
+      role: 'button',
+      'aria-label': 'Cargar fichero de datos',
+      onClick: function () { input.click(); },
+      onKeydown: function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+      },
+      onDragover: function (e) { e.preventDefault(); zona.classList.add('encima'); },
+      onDragleave: function () { zona.classList.remove('encima'); },
+      onDrop: function (e) {
+        e.preventDefault();
+        zona.classList.remove('encima');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) { importar(e.dataTransfer.files[0]); }
+      }
+    }, [
+      el('div', { class: 'icono-zona' }, [icono('carga', 26)]),
+      el('h3', { text: 'Arrastre aquí el CSV o Excel, o pulse para seleccionarlo' }),
+      el('p', {
+        class: 'pista',
+        text: 'Un mismo fichero puede traer varios censos: se detectan por la cabecera y se cargan de una vez.'
+      }),
+      input
+    ]);
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('carga'), 'Cargar datos']),
+        el('button', {
+          class: 'btn secundario pequeno',
+          onClick: descargarPlantillas
+        }, [icono('descarga', 14), 'Plantillas CSV'])
+      ]),
+      zona,
+      el('div', { class: 'rejilla tres', style: 'margin-top:20px' }, CENSOS.map(function (c) {
+        return el('div', { class: 'columna-reconocida' }, [
+          el('div', { class: 'fila' }, [
+            icono(c.icono, 16),
+            el('strong', { text: c.titulo })
+          ]),
+          el('code', { class: 'cabecera-esperada', text: c.columnas }),
+          el('p', { class: 'silencio', text: c.descripcion })
+        ]);
+      })),
+      el('p', {
+        class: 'leyenda-nota',
+        text: 'La columna de municipios debe llamarse MUNICIPIOS (o CÓDIGO / NOMBRE) y admite «35001», «AGAETE» o «35001 AGAETE». ' +
+          'Los municipios del fichero se actualizan y el resto se conserva, de modo que se puede cargar una provincia hoy y la otra mañana. ' +
+          'Si el fichero trae una fila de TOTALES, se usa para comprobar que lo importado cuadra.'
+      })
+    ]);
+  }
+
+  /* ---------- Avisos de la última importación ---------- */
+
+  function tarjetaResultado() {
+    if (!ultima) { return null; }
+
+    if (ultima.leyendo) {
+      return el('section', { class: 'tarjeta' }, [
+        el('p', { class: 'silencio', text: 'Leyendo ' + ultima.fichero + '…' })
+      ]);
     }
 
-    if (estado.error) {
-      bloque.appendChild(el('div', { class: 'aviso error' }, [
-        icono('aviso'), el('div', { text: estado.error })
-      ]));
-      return bloque;
+    if (ultima.error) {
+      return el('section', { class: 'tarjeta' }, [
+        el('div', { class: 'aviso error' }, [
+          icono('aviso'),
+          el('div', {}, [
+            el('strong', { text: ultima.fichero + ' — ' }),
+            ultima.error
+          ])
+        ])
+      ]);
     }
 
-    var res = estado.res;
+    var res = ultima.res;
+    var partes = [];
 
-    if (res.noReconocidos.length) {
-      var muestra = res.noReconocidos.slice(0, 6).join(', ');
-      bloque.appendChild(el('div', { class: 'aviso' }, [
-        icono('aviso'),
+    partes.push(el('div', { class: 'rejilla tres' }, ultima.resumen.map(function (r) {
+      return el('div', { class: 'tarjeta kpi', style: 'box-shadow:none' }, [
+        el('span', { class: 'etiqueta', text: r.nombre }),
+        el('span', { class: 'valor num destacado', text: App.ui.numero(r.municipios) }),
+        el('span', {
+          class: 'nota',
+          text: 'municipios · ' + r.nuevos + ' nuevos, ' + r.actualizados + ' actualizados'
+        })
+      ]);
+    })));
+
+    if (res.comprobacion) {
+      var c = res.comprobacion;
+      partes.push(el('div', { class: 'aviso ' + (c.cuadra ? 'ok' : 'error') }, [
+        icono(c.cuadra ? 'check' : 'aviso'),
         el('div', {}, [
-          el('strong', { text: res.noReconocidos.length + ' fila(s) sin municipio reconocible. ' }),
-          'Se han ignorado: ' + muestra + (res.noReconocidos.length > 6 ? '…' : '')
+          el('strong', {
+            text: c.cuadra
+              ? 'Cuadra con la fila TOTALES del fichero. '
+              : 'No cuadra con la fila TOTALES del fichero. '
+          }),
+          c.cuadra
+            ? 'Comprobado: ' + c.lineas.map(function (l) {
+                return l.columna + ' ' + App.ui.numero(l.declarado);
+              }).join(' · ')
+            : null,
+          c.cuadra ? null : el('ul', { style: 'margin:8px 0 0;padding-left:20px' },
+            c.lineas.filter(function (l) { return !l.cuadra; }).map(function (l) {
+              return el('li', {
+                text: l.columna + ': el fichero declara ' + App.ui.numero(l.declarado) +
+                  ' y la suma de sus filas da ' + App.ui.numero(l.calculado)
+              });
+            })
+          )
         ])
       ]));
     }
 
-    /* Código y nombre que no concuerdan: los datos se han importado por código,
-       pero conviene mirarlo antes de fiarse del informe. */
+    /* Un representante por mesa: se informa, no se impone. */
+    if (res.repVsMesas) {
+      var rm = res.repVsMesas;
+      partes.push(el('div', { class: 'aviso ' + (rm.desajustes.length ? '' : 'ok') }, [
+        icono(rm.desajustes.length ? 'aviso' : 'check'),
+        el('div', {}, [
+          rm.desajustes.length
+            ? el('strong', {
+                text: rm.desajustes.length + ' municipio(s) donde los representantes no igualan a las mesas. '
+              })
+            : el('strong', {
+                text: 'Un representante por mesa en los ' + rm.coinciden + ' municipios. '
+              }),
+          rm.desajustes.length
+            ? 'En el resto sí coinciden. Se ha importado lo que dice el fichero; compruebe si es intencionado:'
+            : 'La suma de PD0…PD5 coincide con el número de mesas en todos ellos.',
+          rm.desajustes.length
+            ? el('ul', { style: 'margin:8px 0 0;padding-left:20px' },
+                rm.desajustes.slice(0, 6).map(function (d) {
+                  return el('li', {
+                    text: d.nombre + ': ' + d.representantes + ' representantes frente a ' + d.mesas + ' mesas'
+                  });
+                })
+              )
+            : null
+        ])
+      ]));
+    }
+
+    if (res.noReconocidos.length) {
+      partes.push(el('div', { class: 'aviso' }, [
+        icono('aviso'),
+        el('div', {}, [
+          el('strong', { text: res.noReconocidos.length + ' fila(s) sin municipio reconocible. ' }),
+          'Se han ignorado: ' + res.noReconocidos.slice(0, 8).join(', ') +
+            (res.noReconocidos.length > 8 ? '…' : '')
+        ])
+      ]));
+    }
+
     if (res.discrepancias.length) {
-      bloque.appendChild(el('div', { class: 'aviso error' }, [
+      partes.push(el('div', { class: 'aviso error' }, [
         icono('aviso'),
         el('div', {}, [
           el('strong', {
@@ -2025,71 +2268,68 @@ tfoot td {
       ]));
     }
 
-    return bloque;
-  }
-
-  function zonaCarga(fuente) {
-    var input = el('input', {
-      type: 'file',
-      accept: '.csv,.tsv,.txt,.xlsx',
-      onChange: function (e) {
-        if (e.target.files && e.target.files[0]) { manejar(e.target.files[0]); }
-        e.target.value = '';
-      }
-    });
-
-    function manejar(file) {
-      ultimaCarga[fuente.id] = { leyendo: true, fichero: file.name };
-      App.render();
-
-      procesar(fuente, file, function (err, res) {
-        if (err) {
-          ultimaCarga[fuente.id] = { error: err.message, fichero: file.name };
-          App.ui.flotante('No se pudo importar ' + file.name, true);
-        } else {
-          ultimaCarga[fuente.id] = { res: res, fichero: file.name };
-          App.ui.flotante(res.filasImportadas + ' municipios importados en «' + fuente.titulo + '»');
-        }
-        App.render();
-      });
-    }
-
-    var zona = el('div', {
-      class: 'zona-carga',
-      tabindex: '0',
-      role: 'button',
-      'aria-label': 'Cargar fichero de ' + fuente.titulo,
-      onClick: function () { input.click(); },
-      onKeydown: function (e) {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
-      },
-      onDragover: function (e) { e.preventDefault(); zona.classList.add('encima'); },
-      onDragleave: function () { zona.classList.remove('encima'); },
-      onDrop: function (e) {
-        e.preventDefault();
-        zona.classList.remove('encima');
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) { manejar(e.dataTransfer.files[0]); }
-      }
-    }, [
-      el('div', { class: 'icono-zona' }, [icono(fuente.icono, 24)]),
-      el('h3', { text: fuente.titulo }),
-      el('p', { class: 'pista', text: 'Arrastre el CSV o Excel aquí, o pulse para seleccionarlo' }),
-      input
-    ]);
-
     return el('section', { class: 'tarjeta' }, [
       el('header', {}, [
-        el('h2', {}, [icono(fuente.icono), fuente.titulo]),
-        resumenCarga(fuente)
+        el('h2', {}, [icono('documento'), 'Resultado de la importación']),
+        el('span', { class: 'silencio', text: ultima.fichero })
       ]),
-      el('p', { class: 'silencio', text: fuente.descripcion }),
-      el('p', { class: 'silencio', style: 'margin-top:6px', text: 'Formato esperado — ' + fuente.formato }),
-      el('div', { style: 'margin-top:18px' }, [zona]),
-      avisosDeCarga(fuente)
+      el('div', { class: 'apilar' }, partes)
     ]);
   }
 
-  /* Tabla de comprobación: qué hay cargado ahora mismo, municipio a municipio. */
+  /* ---------- Estado de los censos ---------- */
+
+  function borrarCenso(c) {
+    var n = cuantos(c.id);
+    if (!window.confirm(
+      'Se borrarán los datos de «' + c.titulo + '» (' + n + ' municipios).\n\n' +
+      'Las tarifas de la configuración no se tocan.\n¿Continuar?'
+    )) { return; }
+
+    App.store.muta(function (s) {
+      c.fijar(s, {});
+      delete s.cargas[c.id];
+    });
+    App.ui.flotante('Datos de «' + c.titulo + '» borrados');
+    App.render();
+  }
+
+  function tarjetaCensos() {
+    var estado = App.store.estado();
+    var total = App.geo.MUNICIPIOS.length;
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [el('h2', {}, [icono('documento'), 'Censos cargados'])]),
+      el('div', { class: 'rejilla tres' }, CENSOS.map(function (c) {
+        var n = cuantos(c.id);
+        var carga = estado.cargas[c.id];
+
+        return el('div', { class: 'ficha-censo' }, [
+          el('div', { class: 'entre' }, [
+            el('div', { class: 'fila' }, [icono(c.icono, 18), el('strong', { text: c.titulo })]),
+            n
+              ? el('span', { class: 'chip ok' }, [icono('check', 13), n + ' / ' + total])
+              : el('span', { class: 'chip pendiente', text: 'Sin datos' })
+          ]),
+          n && carga
+            ? el('p', {
+                class: 'silencio',
+                text: carga.fichero + ' · ' + App.ui.fecha(new Date(carga.fecha))
+              })
+            : el('p', { class: 'silencio', text: 'Cargue un fichero con la columna ' + c.columnas + '.' }),
+          n
+            ? el('button', {
+                class: 'btn peligro pequeno',
+                onClick: function () { borrarCenso(c); }
+              }, [icono('papelera', 14), 'Borrar este censo'])
+            : null
+        ]);
+      }))
+    ]);
+  }
+
+  /* ---------- Tabla de comprobación ---------- */
+
   function tablaEstadoDatos() {
     var estado = App.store.estado();
     var filas = App.geo.MUNICIPIOS.map(function (m) {
@@ -2103,12 +2343,20 @@ tfoot td {
         reps: totalReps,
         policia: Number(estado.policia[m.codigo]) || 0
       };
-    });
+    }).filter(function (f) { return f.mesas || f.reps || f.policia; });
 
-    var conDatos = filas.filter(function (f) { return f.mesas || f.reps || f.policia; });
+    if (!filas.length) {
+      return el('section', { class: 'tarjeta' }, [
+        el('header', {}, [el('h2', {}, [icono('documento'), 'Datos por municipio'])]),
+        el('p', {
+          class: 'sin-datos',
+          text: 'Todavía no hay datos cargados. Empiece por las mesas: sin ellas no hay cálculo posible.'
+        })
+      ]);
+    }
+
     var cuerpo = el('tbody');
-
-    (conDatos.length ? conDatos : []).forEach(function (f) {
+    filas.forEach(function (f) {
       cuerpo.appendChild(el('tr', {}, [
         el('td', { class: 'num', text: f.m.codigo }),
         el('td', { text: f.m.nombre }),
@@ -2119,86 +2367,70 @@ tfoot td {
       ]));
     });
 
-    var totales = conDatos.reduce(function (a, f) {
+    var totales = filas.reduce(function (a, f) {
       a.mesas += f.mesas; a.reps += f.reps; a.policia += f.policia;
       return a;
     }, { mesas: 0, reps: 0, policia: 0 });
 
     return el('section', { class: 'tarjeta' }, [
       el('header', {}, [
-        el('h2', {}, [icono('documento'), 'Datos cargados']),
-        el('div', { class: 'fila' }, [
-          el('span', {
-            class: 'silencio',
-            text: conDatos.length + ' de ' + App.geo.MUNICIPIOS.length + ' municipios con datos'
-          }),
-          el('button', {
-            class: 'btn secundario pequeno',
-            onClick: descargarPlantillas
-          }, [icono('descarga', 14), 'Plantillas CSV'])
-        ])
+        el('h2', {}, [icono('documento'), 'Datos por municipio']),
+        el('span', {
+          class: 'silencio',
+          text: filas.length + ' de ' + App.geo.MUNICIPIOS.length + ' municipios con datos'
+        })
       ]),
-      conDatos.length
-        ? el('div', { class: 'tabla-scroll', style: 'max-height:420px;overflow-y:auto' }, [
-            el('table', {}, [
-              el('thead', {}, [
-                el('tr', {}, [
-                  el('th', { text: 'Código' }),
-                  el('th', { text: 'Municipio' }),
-                  el('th', { text: 'Isla' }),
-                  el('th', { class: 'n', text: 'Mesas' }),
-                  el('th', { class: 'n', text: 'Representantes' }),
-                  el('th', { class: 'n', text: 'Efectivos policía' })
-                ])
-              ]),
-              cuerpo,
-              el('tfoot', {}, [
-                el('tr', {}, [
-                  el('td', { colspan: '3', text: 'Total' }),
-                  el('td', { class: 'n', text: App.ui.numero(totales.mesas) }),
-                  el('td', { class: 'n', text: App.ui.numero(totales.reps) }),
-                  el('td', { class: 'n', text: App.ui.numero(totales.policia) })
-                ])
-              ])
+      el('div', { class: 'tabla-scroll alta' }, [
+        el('table', {}, [
+          el('thead', {}, [
+            el('tr', {}, [
+              el('th', { text: 'Código' }),
+              el('th', { text: 'Municipio' }),
+              el('th', { text: 'Isla' }),
+              el('th', { class: 'n', text: 'Mesas' }),
+              el('th', { class: 'n', text: 'Representantes' }),
+              el('th', { class: 'n', text: 'Efectivos policía' })
+            ])
+          ]),
+          cuerpo,
+          el('tfoot', {}, [
+            el('tr', {}, [
+              el('td', { colspan: '3', text: 'Total' }),
+              el('td', { class: 'n', text: App.ui.numero(totales.mesas) }),
+              el('td', { class: 'n', text: App.ui.numero(totales.reps) }),
+              el('td', { class: 'n', text: App.ui.numero(totales.policia) })
             ])
           ])
-        : el('p', {
-            class: 'sin-datos',
-            text: 'Todavía no hay datos cargados. Empiece por las mesas: sin ellas no hay cálculo posible.'
-          })
+        ])
+      ])
     ]);
   }
 
+  /* ---------- Plantillas ---------- */
+
   function descargarPlantillas() {
-    var cabeceraMesas = [['MUNICIPIO', 'MESAS']];
-    var cabeceraPolicia = [['MUNICIPIO', 'EFECTIVOS']];
-    var cabeceraReps = [['MUNICIPIOS'].concat(App.store.TIPOLOGIAS_PD)];
+    var datos = [['MUNICIPIOS'].concat(App.store.TIPOLOGIAS_PD).concat(['MESAS'])];
+    var policia = [['MUNICIPIOS', 'EFECTIVOS']];
 
     App.geo.MUNICIPIOS.forEach(function (m) {
       var etiqueta = m.codigo + ' ' + m.nombre;
-      cabeceraMesas.push([etiqueta, '']);
-      cabeceraPolicia.push([etiqueta, '']);
-      cabeceraReps.push([etiqueta, '', '', '', '', '', '']);
+      datos.push([etiqueta, '', '', '', '', '', '', '']);
+      policia.push([etiqueta, '']);
     });
 
-    App.ui.descargar('plantilla-mesas.csv', App.ui.aCSV(cabeceraMesas));
+    App.ui.descargar('plantilla-representantes-y-mesas.csv', App.ui.aCSV(datos));
     setTimeout(function () {
-      App.ui.descargar('plantilla-representantes.csv', App.ui.aCSV(cabeceraReps));
-    }, 300);
-    setTimeout(function () {
-      App.ui.descargar('plantilla-policia.csv', App.ui.aCSV(cabeceraPolicia));
-    }, 600);
-    App.ui.flotante('Descargando las tres plantillas con los 88 municipios');
+      App.ui.descargar('plantilla-policia.csv', App.ui.aCSV(policia));
+    }, 400);
+    App.ui.flotante('Descargando las plantillas con los 88 municipios');
   }
+
+  /* ---------- Convocatoria ---------- */
 
   function nombreCopia() {
     var conv = App.store.estado().convocatoria || 'proceso';
     var limpio = App.geo.normaliza(conv).replace(/ /g, '-') || 'proceso';
     return 'gastos-' + limpio + '-' + new Date().toISOString().slice(0, 10) + '.json';
-  }
-
-  function exportarCopia() {
-    App.ui.descargar(nombreCopia(), JSON.stringify(App.store.exportar(), null, 2), 'application/json');
   }
 
   function botonRestaurar() {
@@ -2210,6 +2442,7 @@ tfoot td {
         if (!f) { return; }
         f.text().then(function (txt) {
           App.store.importar(JSON.parse(txt));
+          ultima = null;
           App.ui.flotante('Copia restaurada');
           App.render();
         }).catch(function () {
@@ -2227,16 +2460,13 @@ tfoot td {
   }
 
   function hayDatos() {
-    return FUENTES.some(function (f) { return cuantosDatos(f.id) > 0; });
+    return CENSOS.some(function (c) { return cuantos(c.id) > 0; });
   }
 
-  /* Vaciar los datos sin tocar las tarifas: es el gesto de cerrar una
-     convocatoria y abrir la siguiente, donde los censos cambian enteros pero los
-     importes se suelen retocar, no rehacer. */
-  function borrarTodosLosDatos() {
-    var detalle = FUENTES
-      .filter(function (f) { return cuantosDatos(f.id) > 0; })
-      .map(function (f) { return '· ' + f.titulo + ': ' + cuantosDatos(f.id) + ' municipios'; })
+  function borrarTodosLosCensos() {
+    var detalle = CENSOS
+      .filter(function (c) { return cuantos(c.id) > 0; })
+      .map(function (c) { return '· ' + c.titulo + ': ' + cuantos(c.id) + ' municipios'; })
       .join('\n');
 
     if (!window.confirm(
@@ -2246,10 +2476,10 @@ tfoot td {
     )) { return; }
 
     App.store.muta(function (s) {
-      FUENTES.forEach(function (f) { f.limpiar(s); });
+      CENSOS.forEach(function (c) { c.fijar(s, {}); });
       s.cargas = {};
     });
-    FUENTES.forEach(function (f) { delete ultimaCarga[f.id]; });
+    ultima = null;
     App.ui.flotante('Censos borrados. Las tarifas siguen configuradas.');
     App.render();
   }
@@ -2269,13 +2499,17 @@ tfoot td {
       }),
 
       el('div', { class: 'fila', style: 'margin-top:18px' }, [
-        el('button', { class: 'btn secundario', onClick: exportarCopia },
-          [icono('descarga', 16), 'Exportar copia (JSON)']),
+        el('button', {
+          class: 'btn secundario',
+          onClick: function () {
+            App.ui.descargar(nombreCopia(), JSON.stringify(App.store.exportar(), null, 2), 'application/json');
+          }
+        }, [icono('descarga', 16), 'Exportar copia (JSON)']),
         botonRestaurar(),
         el('button', {
           class: 'btn peligro',
           disabled: !hayDatos(),
-          onClick: borrarTodosLosDatos
+          onClick: borrarTodosLosCensos
         }, [icono('papelera', 16), 'Borrar todos los censos'])
       ]),
 
@@ -2293,7 +2527,7 @@ tfoot td {
               '¿Continuar?'
             )) {
               App.store.reiniciar();
-              FUENTES.forEach(function (f) { delete ultimaCarga[f.id]; });
+              ultima = null;
               App.ui.flotante('Aplicación reiniciada por completo');
               App.render();
             }
@@ -2306,10 +2540,12 @@ tfoot td {
   App.vistas = App.vistas || {};
   App.vistas.datos = {
     titulo: 'Carga de Datos',
-    subtitulo: 'Actualice los censos del proceso. Los ficheros pueden ser CSV o Excel (.xlsx) y se reconocen los municipios por código o por nombre.',
+    subtitulo: 'Cargue los censos del proceso desde CSV o Excel. Los municipios se reconocen por código o por nombre, y un mismo fichero puede traer varios censos a la vez.',
     render: function () {
       return el('div', { class: 'apilar', style: 'gap:24px' }, [
-        el('div', { class: 'rejilla tres' }, FUENTES.map(zonaCarga)),
+        zonaCarga(),
+        tarjetaResultado(),
+        tarjetaCensos(),
         tablaEstadoDatos(),
         tarjetaConvocatoria()
       ]);
