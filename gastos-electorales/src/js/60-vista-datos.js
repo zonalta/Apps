@@ -406,7 +406,7 @@
 
   function tablaEstadoDatos() {
     var estado = App.store.estado();
-    var filas = App.geo.MUNICIPIOS.map(function (m) {
+    var filas = App.geo.ordenarPorNombre(App.geo.MUNICIPIOS).map(function (m) {
       var reps = estado.representantes[m.codigo] || {};
       var totalReps = App.store.TIPOLOGIAS_PD.reduce(function (a, t) {
         return a + (Number(reps[t]) || 0);
