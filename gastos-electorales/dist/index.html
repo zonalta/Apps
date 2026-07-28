@@ -845,14 +845,19 @@ tfoot td {
     return base;
   }
 
+  /* Compara dos nombres de isla o municipio ignorando el artículo, en
+     cualquiera de sus dos formas ("La Gomera" o "Gomera, La"). Sirve tanto
+     para ordenar listas como para ordenar columnas de una tabla. */
+  function compararNombres(a, b) {
+    return normaliza(claveOrden(a)).localeCompare(normaliza(claveOrden(b)), 'es');
+  }
+
   /* Copia ordenada alfabéticamente (por nombre, ignorando el artículo) de
      cualquier lista de islas o municipios. No toca el orden original, que se
      conserva por si algo depende de él (ninguna parte del cálculo lo hace,
      pero el orden de origen sigue siendo el del código INE). */
   function ordenarPorNombre(lista) {
-    return lista.slice().sort(function (a, b) {
-      return normaliza(claveOrden(a.nombre)).localeCompare(normaliza(claveOrden(b.nombre)), 'es');
-    });
+    return lista.slice().sort(function (a, b) { return compararNombres(a.nombre, b.nombre); });
   }
 
   /* Devuelve '35', '38' o null si el texto no identifica ninguna provincia. */
@@ -909,7 +914,8 @@ tfoot td {
     resolverMunicipio: resolverMunicipio,
     discrepancia: discrepancia,
     provinciaDeTexto: provinciaDeTexto,
-    ordenarPorNombre: ordenarPorNombre
+    ordenarPorNombre: ordenarPorNombre,
+    compararNombres: compararNombres
   };
 })(window.App = window.App || {});
 
@@ -3763,15 +3769,24 @@ tfoot td {
     }
   }
 
-  function ordenarFilas(filas, columnas, ordenActivo) {
+  function ordenarFilas(filas, columnas, ordenActivo, pestana) {
     if (!ordenActivo) { return filas; }
+
+    /* Al ordenar el desglose "Por municipio" por isla, dentro de cada isla los
+       municipios se esperan en orden alfabético. Se consigue pre-ordenando por
+       nombre y ordenando después por isla con un sort estable: los empates
+       (mismos municipios de una isla) conservan ese orden alfabético previo. */
+    var base = (pestana === 'municipio' && ordenActivo.clave === 'isla')
+      ? App.geo.ordenarPorNombre(filas)
+      : filas;
+
     var col = columnas.filter(function (c) { return c.clave === ordenActivo.clave; })[0];
     var dir = ordenActivo.direccion === 'asc' ? 1 : -1;
-    return filas.slice().sort(function (a, b) {
+    return base.slice().sort(function (a, b) {
       var va = a[ordenActivo.clave];
       var vb = b[ordenActivo.clave];
       if (col && col.num) { return ((Number(va) || 0) - (Number(vb) || 0)) * dir; }
-      return String(va == null ? '' : va).localeCompare(String(vb == null ? '' : vb), 'es') * dir;
+      return App.geo.compararNombres(va == null ? '' : va, vb == null ? '' : vb) * dir;
     });
   }
 
@@ -3780,7 +3795,7 @@ tfoot td {
     var termino = App.geo.normaliza(f.busquedaTabla);
     var datos = datosTabla(informe, f.pestana, termino);
     var ordenActivo = f.orden[f.pestana];
-    datos.filas = ordenarFilas(datos.filas, datos.columnas, ordenActivo);
+    datos.filas = ordenarFilas(datos.filas, datos.columnas, ordenActivo, f.pestana);
 
     var cuerpo = el('tbody');
     datos.filas.forEach(function (fila) {

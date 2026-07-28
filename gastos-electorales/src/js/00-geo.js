@@ -203,14 +203,19 @@
     return base;
   }
 
+  /* Compara dos nombres de isla o municipio ignorando el artículo, en
+     cualquiera de sus dos formas ("La Gomera" o "Gomera, La"). Sirve tanto
+     para ordenar listas como para ordenar columnas de una tabla. */
+  function compararNombres(a, b) {
+    return normaliza(claveOrden(a)).localeCompare(normaliza(claveOrden(b)), 'es');
+  }
+
   /* Copia ordenada alfabéticamente (por nombre, ignorando el artículo) de
      cualquier lista de islas o municipios. No toca el orden original, que se
      conserva por si algo depende de él (ninguna parte del cálculo lo hace,
      pero el orden de origen sigue siendo el del código INE). */
   function ordenarPorNombre(lista) {
-    return lista.slice().sort(function (a, b) {
-      return normaliza(claveOrden(a.nombre)).localeCompare(normaliza(claveOrden(b.nombre)), 'es');
-    });
+    return lista.slice().sort(function (a, b) { return compararNombres(a.nombre, b.nombre); });
   }
 
   /* Devuelve '35', '38' o null si el texto no identifica ninguna provincia. */
@@ -267,6 +272,7 @@
     resolverMunicipio: resolverMunicipio,
     discrepancia: discrepancia,
     provinciaDeTexto: provinciaDeTexto,
-    ordenarPorNombre: ordenarPorNombre
+    ordenarPorNombre: ordenarPorNombre,
+    compararNombres: compararNombres
   };
 })(window.App = window.App || {});
