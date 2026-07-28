@@ -249,7 +249,7 @@
       id: 'representantes',
       nombre: 'Representantes de la Administración',
       columnas: App.store.TIPOLOGIAS_PD.map(function (t) {
-        return { clave: t, patron: new RegExp('^' + t.toLowerCase().replace('pd', 'pd\\s*') + '$') };
+        return { clave: t, etiqueta: t, patron: new RegExp('^' + t.toLowerCase().replace('pd', 'pd\\s*') + '$') };
       }),
       /* Varias columnas: el valor de cada municipio es un objeto PD0..PD5. */
       leer: function (fila, cols) {
@@ -268,7 +268,7 @@
     {
       id: 'mesas',
       nombre: 'Mesas electorales',
-      columnas: [{ clave: 'mesas', patron: /^(mesas|n mesas|no mesas|num mesas|numero de mesas|total mesas|mesas electorales)$/ }],
+      columnas: [{ clave: 'mesas', etiqueta: 'MESAS', patron: /^(mesas|n mesas|no mesas|num mesas|numero de mesas|total mesas|mesas electorales)$/ }],
       leer: function (fila, cols) { return aNumero(fila[cols.mesas]); },
       sumar: function (acc, v) { return acc + v; },
       vacio: function () { return 0; }
@@ -276,7 +276,7 @@
     {
       id: 'policia',
       nombre: 'Efectivos de policía',
-      columnas: [{ clave: 'policia', patron: /^(efectivos|policia|agentes|dotacion|efectivos policia|efectivos de policia)$/ }],
+      columnas: [{ clave: 'policia', etiqueta: 'EFECTIVOS', patron: /^(efectivos|policia|agentes|dotacion|efectivos policia|efectivos de policia)$/ }],
       leer: function (fila, cols) { return aNumero(fila[cols.policia]); },
       sumar: function (acc, v) { return acc + v; },
       vacio: function () { return 0; }
@@ -284,6 +284,7 @@
   ];
 
   var PATRON_MUNICIPIO = /^(municipios?|codigo|cod|nombre|termino municipal|ayuntamientos?)$/;
+  var PATRON_PROVINCIA = /^(provincias?|prov|cpro)$/;
   var PATRON_TOTALES = /^(total|totales|suma|sumas|total general)/;
 
   /* Localiza la fila de cabecera y el índice de cada columna conocida. Se miran
@@ -292,10 +293,12 @@
     for (var f = 0; f < Math.min(filas.length, 20); f++) {
       var cols = {};
       var municipio = -1;
+      var provincia = -1;
 
       filas[f].forEach(function (celda, c) {
         var txt = App.geo.normaliza(celda);
         if (!txt) { return; }
+        if (provincia < 0 && PATRON_PROVINCIA.test(txt)) { provincia = c; return; }
         if (municipio < 0 && PATRON_MUNICIPIO.test(txt)) { municipio = c; return; }
         BLOQUES.forEach(function (b) {
           b.columnas.forEach(function (col) {
@@ -304,7 +307,9 @@
         });
       });
 
-      if (municipio >= 0) { return { indice: f, municipio: municipio, columnas: cols }; }
+      if (municipio >= 0) {
+        return { indice: f, municipio: municipio, provincia: provincia, columnas: cols };
+      }
     }
     return null;
   }
@@ -340,6 +345,7 @@
 
     var noReconocidos = [];
     var discrepancias = [];
+    var provinciasDiscordantes = [];
     var filaTotales = null;
 
     for (var f = cab.indice + 1; f < filas.length; f++) {
@@ -361,6 +367,20 @@
       var choque = App.geo.discrepancia(texto, codigo);
       if (choque) { discrepancias.push(choque); }
 
+      /* La columna PROVINCIA no se importa —la provincia se deduce del código—
+         pero si el fichero la trae y no concuerda, conviene decirlo. */
+      if (cab.provincia >= 0) {
+        var declarada = App.geo.provinciaDeTexto(fila[cab.provincia]);
+        var real = App.geo.municipio(codigo).provincia;
+        if (declarada && declarada !== real) {
+          provinciasDiscordantes.push({
+            texto: texto,
+            declarada: App.geo.provincia(declarada).nombre,
+            real: App.geo.provincia(real).nombre
+          });
+        }
+      }
+
       presentes.forEach(function (b) {
         var valor = b.leer(fila, cab.columnas);
         resultado[b.id][codigo] = valor;
@@ -381,7 +401,7 @@
           var cuadra = Math.abs(declarado - calculado) < 0.005;
           if (!cuadra) { comprobacion.cuadra = false; }
           comprobacion.lineas.push({
-            columna: col.clave.toUpperCase(),
+            columna: col.etiqueta,
             declarado: declarado,
             calculado: calculado,
             cuadra: cuadra
@@ -428,6 +448,7 @@
       }),
       noReconocidos: noReconocidos,
       discrepancias: discrepancias,
+      provinciasDiscordantes: provinciasDiscordantes,
       comprobacion: comprobacion,
       repVsMesas: repVsMesas
     };

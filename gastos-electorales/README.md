@@ -107,10 +107,17 @@ La columna de municipios debe llamarse `MUNICIPIOS` (o `CÓDIGO` / `NOMBRE`) y
 admite `35001`, `AGAETE` o `35001 AGAETE`, con el artículo en cualquier posición
 (`La Oliva`, `Oliva, La`, `OLIVA (LA)`).
 
+**Las columnas que no se reconocen se ignoran sin estorbar**, así que el orden da
+igual y sobran columnas sin problema. La excepción es `PROVINCIA`: no se importa
+—la provincia se deduce siempre del código del municipio— pero si está, se usa
+para comprobar que concuerda.
+
+El fichero maestro real tiene esta forma, y alimenta los tres censos de una vez:
+
 ```
-MUNICIPIOS;PD0;PD1;PD2;PD3;PD4;PD5;MESAS
-35001 AGAETE;5;2;2;0;1;0;10
-TOTALES;986;114;140;184;82;58;1564
+PROVINCIA;MUNICIPIOS;PD0;PD1;PD2;PD3;PD4;PD5;MESAS;EFECTIVOS
+LAS PALMAS;35001 AGAETE;5;2;2;0;1;0;10;4
+;TOTALES;986;114;140;184;82;58;1564;626
 ```
 
 **La carga fusiona, no reemplaza.** Los municipios del fichero se actualizan y el
@@ -119,7 +126,7 @@ Para empezar de cero está el botón de borrar de cada censo.
 
 ### Comprobaciones de la importación
 
-Cuatro, todas visibles en pantalla tras cargar:
+Cinco, todas visibles en pantalla tras cargar:
 
 1. **Fila de totales** — si el fichero trae una fila `TOTALES`, se contrasta
    columna a columna contra la suma de las filas importadas. Detecta ficheros
@@ -134,9 +141,15 @@ Cuatro, todas visibles en pantalla tras cargar:
    refieren al mismo municipio. Los datos se importan usando el código, pero se
    avisa: sin este aviso, un fichero con otra codificación colgaría las cifras
    del municipio equivocado sin que nadie se enterase.
+5. **Provincia declarada frente a la del código** — si el fichero trae columna
+   `PROVINCIA`. Se aceptan tanto el código (`35`, `38`) como el nombre y sus
+   formas habituales (`LAS PALMAS`, `S/C DE TENERIFE`, `TENERIFE`). Una fila
+   discordante suele delatar un copiado mal hecho entre hojas.
 
 Desde «Carga de Datos» se descargan dos plantillas con los 88 municipios: la
-combinada de representantes y mesas, y la de policía.
+combinada de representantes y mesas, y la de policía. Si los efectivos llegan a
+tiempo, basta con añadir la columna `EFECTIVOS` al fichero maestro y no hace
+falta el segundo.
 
 ## Reutilizar la herramienta en otra convocatoria
 

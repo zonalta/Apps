@@ -182,6 +182,27 @@
     return null;
   }
 
+  /* Formas en que un fichero puede nombrar a cada provincia. Sirve para
+     contrastar la columna PROVINCIA, cuando existe, contra la que le
+     corresponde al municipio por su código. */
+  var ALIAS_PROVINCIA = {
+    '35': ['35', 'las palmas', 'palmas las', 'palmas', 'provincia de las palmas'],
+    '38': ['38', 'santa cruz de tenerife', 's c de tenerife', 'sc de tenerife',
+      'sta cruz de tenerife', 'santa cruz tenerife', 'tenerife',
+      'provincia de santa cruz de tenerife']
+  };
+
+  /* Devuelve '35', '38' o null si el texto no identifica ninguna provincia. */
+  function provinciaDeTexto(valor) {
+    var norm = normaliza(valor);
+    if (!norm) { return null; }
+    var encontrada = null;
+    Object.keys(ALIAS_PROVINCIA).forEach(function (id) {
+      if (ALIAS_PROVINCIA[id].indexOf(norm) >= 0) { encontrada = id; }
+    });
+    return encontrada;
+  }
+
   /* Cuando una celda trae código y nombre juntos ("35001 AGAETE"), comprueba que
      se refieran al mismo municipio. Un desajuste significa que el fichero sigue
      otra codificación, y hay que avisar: importar por código sin más ruido
@@ -223,6 +244,7 @@
     },
     normaliza: normaliza,
     resolverMunicipio: resolverMunicipio,
-    discrepancia: discrepancia
+    discrepancia: discrepancia,
+    provinciaDeTexto: provinciaDeTexto
   };
 })(window.App = window.App || {});

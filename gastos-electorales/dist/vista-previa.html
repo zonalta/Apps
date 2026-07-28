@@ -698,6 +698,27 @@ tfoot td {
     return null;
   }
 
+  /* Formas en que un fichero puede nombrar a cada provincia. Sirve para
+     contrastar la columna PROVINCIA, cuando existe, contra la que le
+     corresponde al municipio por su código. */
+  var ALIAS_PROVINCIA = {
+    '35': ['35', 'las palmas', 'palmas las', 'palmas', 'provincia de las palmas'],
+    '38': ['38', 'santa cruz de tenerife', 's c de tenerife', 'sc de tenerife',
+      'sta cruz de tenerife', 'santa cruz tenerife', 'tenerife',
+      'provincia de santa cruz de tenerife']
+  };
+
+  /* Devuelve '35', '38' o null si el texto no identifica ninguna provincia. */
+  function provinciaDeTexto(valor) {
+    var norm = normaliza(valor);
+    if (!norm) { return null; }
+    var encontrada = null;
+    Object.keys(ALIAS_PROVINCIA).forEach(function (id) {
+      if (ALIAS_PROVINCIA[id].indexOf(norm) >= 0) { encontrada = id; }
+    });
+    return encontrada;
+  }
+
   /* Cuando una celda trae código y nombre juntos ("35001 AGAETE"), comprueba que
      se refieran al mismo municipio. Un desajuste significa que el fichero sigue
      otra codificación, y hay que avisar: importar por código sin más ruido
@@ -739,7 +760,8 @@ tfoot td {
     },
     normaliza: normaliza,
     resolverMunicipio: resolverMunicipio,
-    discrepancia: discrepancia
+    discrepancia: discrepancia,
+    provinciaDeTexto: provinciaDeTexto
   };
 })(window.App = window.App || {});
 
@@ -1135,7 +1157,7 @@ tfoot td {
       id: 'representantes',
       nombre: 'Representantes de la Administración',
       columnas: App.store.TIPOLOGIAS_PD.map(function (t) {
-        return { clave: t, patron: new RegExp('^' + t.toLowerCase().replace('pd', 'pd\\s*') + '$') };
+        return { clave: t, etiqueta: t, patron: new RegExp('^' + t.toLowerCase().replace('pd', 'pd\\s*') + '$') };
       }),
       /* Varias columnas: el valor de cada municipio es un objeto PD0..PD5. */
       leer: function (fila, cols) {
@@ -1154,7 +1176,7 @@ tfoot td {
     {
       id: 'mesas',
       nombre: 'Mesas electorales',
-      columnas: [{ clave: 'mesas', patron: /^(mesas|n mesas|no mesas|num mesas|numero de mesas|total mesas|mesas electorales)$/ }],
+      columnas: [{ clave: 'mesas', etiqueta: 'MESAS', patron: /^(mesas|n mesas|no mesas|num mesas|numero de mesas|total mesas|mesas electorales)$/ }],
       leer: function (fila, cols) { return aNumero(fila[cols.mesas]); },
       sumar: function (acc, v) { return acc + v; },
       vacio: function () { return 0; }
@@ -1162,7 +1184,7 @@ tfoot td {
     {
       id: 'policia',
       nombre: 'Efectivos de policía',
-      columnas: [{ clave: 'policia', patron: /^(efectivos|policia|agentes|dotacion|efectivos policia|efectivos de policia)$/ }],
+      columnas: [{ clave: 'policia', etiqueta: 'EFECTIVOS', patron: /^(efectivos|policia|agentes|dotacion|efectivos policia|efectivos de policia)$/ }],
       leer: function (fila, cols) { return aNumero(fila[cols.policia]); },
       sumar: function (acc, v) { return acc + v; },
       vacio: function () { return 0; }
@@ -1170,6 +1192,7 @@ tfoot td {
   ];
 
   var PATRON_MUNICIPIO = /^(municipios?|codigo|cod|nombre|termino municipal|ayuntamientos?)$/;
+  var PATRON_PROVINCIA = /^(provincias?|prov|cpro)$/;
   var PATRON_TOTALES = /^(total|totales|suma|sumas|total general)/;
 
   /* Localiza la fila de cabecera y el índice de cada columna conocida. Se miran
@@ -1178,10 +1201,12 @@ tfoot td {
     for (var f = 0; f < Math.min(filas.length, 20); f++) {
       var cols = {};
       var municipio = -1;
+      var provincia = -1;
 
       filas[f].forEach(function (celda, c) {
         var txt = App.geo.normaliza(celda);
         if (!txt) { return; }
+        if (provincia < 0 && PATRON_PROVINCIA.test(txt)) { provincia = c; return; }
         if (municipio < 0 && PATRON_MUNICIPIO.test(txt)) { municipio = c; return; }
         BLOQUES.forEach(function (b) {
           b.columnas.forEach(function (col) {
@@ -1190,7 +1215,9 @@ tfoot td {
         });
       });
 
-      if (municipio >= 0) { return { indice: f, municipio: municipio, columnas: cols }; }
+      if (municipio >= 0) {
+        return { indice: f, municipio: municipio, provincia: provincia, columnas: cols };
+      }
     }
     return null;
   }
@@ -1226,6 +1253,7 @@ tfoot td {
 
     var noReconocidos = [];
     var discrepancias = [];
+    var provinciasDiscordantes = [];
     var filaTotales = null;
 
     for (var f = cab.indice + 1; f < filas.length; f++) {
@@ -1247,6 +1275,20 @@ tfoot td {
       var choque = App.geo.discrepancia(texto, codigo);
       if (choque) { discrepancias.push(choque); }
 
+      /* La columna PROVINCIA no se importa —la provincia se deduce del código—
+         pero si el fichero la trae y no concuerda, conviene decirlo. */
+      if (cab.provincia >= 0) {
+        var declarada = App.geo.provinciaDeTexto(fila[cab.provincia]);
+        var real = App.geo.municipio(codigo).provincia;
+        if (declarada && declarada !== real) {
+          provinciasDiscordantes.push({
+            texto: texto,
+            declarada: App.geo.provincia(declarada).nombre,
+            real: App.geo.provincia(real).nombre
+          });
+        }
+      }
+
       presentes.forEach(function (b) {
         var valor = b.leer(fila, cab.columnas);
         resultado[b.id][codigo] = valor;
@@ -1267,7 +1309,7 @@ tfoot td {
           var cuadra = Math.abs(declarado - calculado) < 0.005;
           if (!cuadra) { comprobacion.cuadra = false; }
           comprobacion.lineas.push({
-            columna: col.clave.toUpperCase(),
+            columna: col.etiqueta,
             declarado: declarado,
             calculado: calculado,
             cuadra: cuadra
@@ -1314,6 +1356,7 @@ tfoot td {
       }),
       noReconocidos: noReconocidos,
       discrepancias: discrepancias,
+      provinciasDiscordantes: provinciasDiscordantes,
       comprobacion: comprobacion,
       repVsMesas: repVsMesas
     };
@@ -1989,7 +2032,7 @@ tfoot td {
       id: 'representantes',
       titulo: 'Representantes de la Administración',
       icono: 'grupo',
-      columnas: 'PD0 · PD1 · PD2 · PD3 · PD4 · PD5',
+      columnas: 'PD0 … PD5',
       descripcion: 'Número de representantes de cada tipología. Cada uno cobra según su tipología.',
       mapa: function (s) { return s.representantes; },
       fijar: function (s, m) { s.representantes = m; }
@@ -2136,6 +2179,7 @@ tfoot td {
       el('p', {
         class: 'leyenda-nota',
         text: 'La columna de municipios debe llamarse MUNICIPIOS (o CÓDIGO / NOMBRE) y admite «35001», «AGAETE» o «35001 AGAETE». ' +
+          'Las columnas que no se reconocen se ignoran sin estorbar; si hay una PROVINCIA, se usa para comprobar que concuerda con el código. ' +
           'Los municipios del fichero se actualizan y el resto se conserva, de modo que se puede cargar una provincia hoy y la otra mañana. ' +
           'Si el fichero trae una fila de TOTALES, se usa para comprobar que lo importado cuadra.'
       })
@@ -2242,6 +2286,26 @@ tfoot td {
           el('strong', { text: res.noReconocidos.length + ' fila(s) sin municipio reconocible. ' }),
           'Se han ignorado: ' + res.noReconocidos.slice(0, 8).join(', ') +
             (res.noReconocidos.length > 8 ? '…' : '')
+        ])
+      ]));
+    }
+
+    if (res.provinciasDiscordantes && res.provinciasDiscordantes.length) {
+      partes.push(el('div', { class: 'aviso error' }, [
+        icono('aviso'),
+        el('div', {}, [
+          el('strong', {
+            text: res.provinciasDiscordantes.length + ' fila(s) cuya columna PROVINCIA no concuerda con el código. '
+          }),
+          'La provincia se deduce siempre del código del municipio, así que los datos están donde deben; ' +
+          'pero revise el fichero, porque suele delatar filas mal copiadas:',
+          el('ul', { style: 'margin:8px 0 0;padding-left:20px' },
+            res.provinciasDiscordantes.slice(0, 5).map(function (d) {
+              return el('li', {
+                text: '«' + d.texto + '» — el fichero dice ' + d.declarada + ' y por código es ' + d.real
+              });
+            })
+          )
         ])
       ]));
     }

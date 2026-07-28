@@ -21,7 +21,7 @@
       id: 'representantes',
       titulo: 'Representantes de la Administración',
       icono: 'grupo',
-      columnas: 'PD0 · PD1 · PD2 · PD3 · PD4 · PD5',
+      columnas: 'PD0 … PD5',
       descripcion: 'Número de representantes de cada tipología. Cada uno cobra según su tipología.',
       mapa: function (s) { return s.representantes; },
       fijar: function (s, m) { s.representantes = m; }
@@ -168,6 +168,7 @@
       el('p', {
         class: 'leyenda-nota',
         text: 'La columna de municipios debe llamarse MUNICIPIOS (o CÓDIGO / NOMBRE) y admite «35001», «AGAETE» o «35001 AGAETE». ' +
+          'Las columnas que no se reconocen se ignoran sin estorbar; si hay una PROVINCIA, se usa para comprobar que concuerda con el código. ' +
           'Los municipios del fichero se actualizan y el resto se conserva, de modo que se puede cargar una provincia hoy y la otra mañana. ' +
           'Si el fichero trae una fila de TOTALES, se usa para comprobar que lo importado cuadra.'
       })
@@ -274,6 +275,26 @@
           el('strong', { text: res.noReconocidos.length + ' fila(s) sin municipio reconocible. ' }),
           'Se han ignorado: ' + res.noReconocidos.slice(0, 8).join(', ') +
             (res.noReconocidos.length > 8 ? '…' : '')
+        ])
+      ]));
+    }
+
+    if (res.provinciasDiscordantes && res.provinciasDiscordantes.length) {
+      partes.push(el('div', { class: 'aviso error' }, [
+        icono('aviso'),
+        el('div', {}, [
+          el('strong', {
+            text: res.provinciasDiscordantes.length + ' fila(s) cuya columna PROVINCIA no concuerda con el código. '
+          }),
+          'La provincia se deduce siempre del código del municipio, así que los datos están donde deben; ' +
+          'pero revise el fichero, porque suele delatar filas mal copiadas:',
+          el('ul', { style: 'margin:8px 0 0;padding-left:20px' },
+            res.provinciasDiscordantes.slice(0, 5).map(function (d) {
+              return el('li', {
+                text: '«' + d.texto + '» — el fichero dice ' + d.declarada + ' y por código es ' + d.real
+              });
+            })
+          )
         ])
       ]));
     }
