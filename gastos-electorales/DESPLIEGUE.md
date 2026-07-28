@@ -26,24 +26,36 @@ gcloud projects add-iam-policy-binding $PROYECTO \
 
 ### 2. Identificador de cliente de Google
 
-En la consola, **APIs y servicios → Pantalla de consentimiento de OAuth**:
+En la consola, **Google Auth Platform** (antes «Pantalla de consentimiento de
+OAuth»; Google rediseñó esta sección, así que las guías antiguas mandan a un menú
+que ya no existe).
+
+**Información de la marca**
+
+- Nombre de la aplicación: `Gestión Electoral`
+- Correo de asistencia y contacto del desarrollador: el tuyo
+
+**Público**
 
 - Tipo de usuario: **Externo**
-- Nombre de la aplicación: `Gestión Electoral`, y tu correo como contacto
-- Ámbitos: no añadas ninguno. Sólo se usa la identidad, que va incluida.
-- **Publica la aplicación** (estado «En producción»). Con ámbitos básicos no hace
-  falta que Google la revise, y evita la lista de usuarios de prueba.
+- Si el estado es «Prueba», pulsar **Publicar app** para pasarlo a «En
+  producción». Con ámbitos básicos Google no revisa nada y el cambio es
+  inmediato; en «Prueba» sólo entrarían los usuarios de prueba listados a mano.
 
-Luego en **Credenciales → Crear credenciales → ID de cliente de OAuth**:
+**Acceso a los datos**
+
+- No añadir ningún ámbito. Sólo se usa la identidad, incluida de serie.
+
+**Clientes → Crear cliente**
 
 - Tipo: **Aplicación web**
 - Orígenes autorizados de JavaScript: la URL de Cloud Run, sin barra final
   (`https://gestion-electoral-635475980649.europe-southwest1.run.app`)
-- No hace falta URI de redirección
+- URIs de redirección: vacío
 
-Copia el **ID de cliente**. Es público por diseño: identifica a la aplicación, no
-autoriza a nadie. El secreto que Google genera al lado **no se usa** y puede
-ignorarse.
+Copia el **ID de cliente** (acaba en `.apps.googleusercontent.com`). Es público
+por diseño: identifica a la aplicación, no autoriza a nadie. El secreto que
+Google genera al lado **no se usa**.
 
 ### 3. Decir al servicio quién puede entrar
 
