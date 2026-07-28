@@ -517,6 +517,56 @@ tfoot td {
 }
 .ficha-censo .entre { width: 100%; }
 
+/* ---------- Diálogo de confirmación ---------- */
+
+.velo-modal {
+  position: fixed; inset: 0; z-index: 80;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  background: rgba(25, 28, 33, 0.45);
+  backdrop-filter: blur(4px);
+}
+.modal {
+  width: min(480px, 100%);
+  background: var(--surface);
+  border-radius: var(--radio-lg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+.cuerpo-modal { padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+.cuerpo-modal h2 { color: var(--primary); }
+.cuerpo-modal p { color: var(--on-surface-variant); line-height: 1.55; }
+.lista-modal {
+  margin: 0; padding: 12px 14px 12px 30px;
+  background: var(--surface-low);
+  border: 1px solid var(--outline);
+  border-radius: var(--radio);
+  color: var(--on-surface);
+}
+.lista-modal li { margin: 3px 0; }
+.nota-modal {
+  padding: 10px 12px; border-radius: var(--radio);
+  background: var(--warning-container);
+  color: var(--on-warning-container) !important;
+  font-size: 13px;
+}
+.pie-modal {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 16px 24px;
+  background: var(--surface-low);
+  border-top: 1px solid var(--outline);
+}
+.btn.peligro-solido { background: var(--error); color: #fff; border-color: var(--error); }
+.btn.peligro-solido:hover { background: #8f1414; }
+
+.lista-rechazos {
+  margin: 8px 0 0; padding: 8px 12px 8px 26px;
+  max-height: 200px; overflow-y: auto;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: var(--radio);
+}
+.lista-rechazos li { margin: 2px 0; font-variant-numeric: tabular-nums; }
+
 </style>
 </head>
 <body>
@@ -1775,6 +1825,81 @@ tfoot td {
     return contenedor;
   }
 
+  /* Diálogo de confirmación propio.
+     No se usa window.confirm porque cuando la página va dentro de un iframe con
+     sandbox —como la vista previa— el navegador ignora la llamada y devuelve
+     false sin avisar, de modo que toda acción que dependiera de ella quedaba
+     muerta en silencio. Lo mismo vale para alert() y print(). */
+  function confirmar(opciones) {
+    var previo = document.querySelector('.velo-modal');
+    if (previo) { previo.remove(); }
+
+    var devuelto = false;
+    function cerrar(aceptado) {
+      if (devuelto) { return; }
+      devuelto = true;
+      document.removeEventListener('keydown', alPulsar, true);
+      velo.remove();
+      if (aceptado && opciones.alConfirmar) { opciones.alConfirmar(); }
+    }
+
+    function alPulsar(e) {
+      if (e.key === 'Escape') { e.preventDefault(); cerrar(false); }
+    }
+
+    var botonConfirmar = el('button', {
+      class: 'btn' + (opciones.peligro ? ' peligro-solido' : ''),
+      onClick: function () { cerrar(true); }
+    }, opciones.textoConfirmar || 'Confirmar');
+
+    var cuerpo = [
+      el('h2', { id: 'titulo-modal', text: opciones.titulo })
+    ];
+    (opciones.parrafos || []).forEach(function (p) {
+      cuerpo.push(el('p', { text: p }));
+    });
+    if (opciones.lista && opciones.lista.length) {
+      cuerpo.push(el('ul', { class: 'lista-modal' }, opciones.lista.map(function (t) {
+        return el('li', { text: t });
+      })));
+    }
+    if (opciones.aviso) {
+      cuerpo.push(el('p', { class: 'nota-modal', text: opciones.aviso }));
+    }
+
+    var dialogo = el('div', {
+      class: 'modal',
+      role: 'dialog',
+      'aria-modal': 'true',
+      'aria-labelledby': 'titulo-modal',
+      onClick: function (e) { e.stopPropagation(); }
+    }, [
+      el('div', { class: 'cuerpo-modal' }, cuerpo),
+      el('div', { class: 'pie-modal' }, [
+        el('button', {
+          class: 'btn secundario',
+          onClick: function () { cerrar(false); }
+        }, opciones.textoCancelar || 'Cancelar'),
+        botonConfirmar
+      ])
+    ]);
+
+    var velo = el('div', {
+      class: 'velo-modal',
+      onClick: function () { cerrar(false); }
+    }, [dialogo]);
+
+    document.body.appendChild(velo);
+    document.addEventListener('keydown', alPulsar, true);
+    botonConfirmar.focus();
+  }
+
+  /* Dentro de un iframe con sandbox el navegador también ignora window.print(),
+     así que hace falta saberlo para ofrecer otra salida. */
+  function enMarco() {
+    try { return window.self !== window.top; } catch (e) { return true; }
+  }
+
   var temporizadorAviso = null;
   function flotante(mensaje, esError) {
     var previo = document.querySelector('.aviso-flotante');
@@ -1821,6 +1946,8 @@ tfoot td {
     fecha: fecha,
     porcentaje: porcentaje,
     barras: barras,
+    confirmar: confirmar,
+    enMarco: enMarco,
     flotante: flotante,
     descargar: descargar,
     aCSV: aCSV
@@ -2288,13 +2415,29 @@ tfoot td {
       ]));
     }
 
+    /* Se listan TODAS, no una muestra: para arreglar el fichero hay que saber
+       exactamente qué filas se quedaron fuera. */
     if (res.noReconocidos.length) {
       partes.push(el('div', { class: 'aviso' }, [
         icono('aviso'),
-        el('div', {}, [
-          el('strong', { text: res.noReconocidos.length + ' fila(s) sin municipio reconocible. ' }),
-          'Se han ignorado: ' + res.noReconocidos.slice(0, 8).join(', ') +
-            (res.noReconocidos.length > 8 ? '…' : '')
+        el('div', { style: 'min-width:0;flex:1' }, [
+          el('strong', { text: res.noReconocidos.length + ' fila(s) sin municipio reconocible, ignoradas. ' }),
+          'Revise cómo está escrito el municipio en estas filas:',
+          el('ul', { class: 'lista-rechazos' },
+            res.noReconocidos.map(function (t) { return el('li', { text: t }); })
+          ),
+          el('button', {
+            class: 'btn secundario pequeno',
+            style: 'margin-top:10px',
+            onClick: function () {
+              App.ui.descargar(
+                'filas-no-reconocidas.csv',
+                App.ui.aCSV([['VALOR EN EL FICHERO']].concat(
+                  res.noReconocidos.map(function (t) { return [t]; })
+                ))
+              );
+            }
+          }, [icono('descarga', 14), 'Descargar la lista'])
         ])
       ]));
     }
@@ -2353,18 +2496,23 @@ tfoot td {
   /* ---------- Estado de los censos ---------- */
 
   function borrarCenso(c) {
-    var n = cuantos(c.id);
-    if (!window.confirm(
-      'Se borrarán los datos de «' + c.titulo + '» (' + n + ' municipios).\n\n' +
-      'Las tarifas de la configuración no se tocan.\n¿Continuar?'
-    )) { return; }
-
-    App.store.muta(function (s) {
-      c.fijar(s, {});
-      delete s.cargas[c.id];
+    App.ui.confirmar({
+      titulo: 'Borrar «' + c.titulo + '»',
+      parrafos: [
+        'Se borrarán los datos de ' + cuantos(c.id) + ' municipios de este censo.',
+        'Las tarifas de la configuración no se tocan, y los demás censos se quedan como están.'
+      ],
+      textoConfirmar: 'Borrar el censo',
+      peligro: true,
+      alConfirmar: function () {
+        App.store.muta(function (s) {
+          c.fijar(s, {});
+          delete s.cargas[c.id];
+        });
+        App.ui.flotante('Datos de «' + c.titulo + '» borrados');
+        App.render();
+      }
     });
-    App.ui.flotante('Datos de «' + c.titulo + '» borrados');
-    App.render();
   }
 
   function tarjetaCensos() {
@@ -2537,24 +2685,25 @@ tfoot td {
   }
 
   function borrarTodosLosCensos() {
-    var detalle = CENSOS
-      .filter(function (c) { return cuantos(c.id) > 0; })
-      .map(function (c) { return '· ' + c.titulo + ': ' + cuantos(c.id) + ' municipios'; })
-      .join('\n');
-
-    if (!window.confirm(
-      'Se borrarán todos los censos cargados:\n\n' + detalle + '\n\n' +
-      'Las tarifas de la configuración se conservan.\n\n' +
-      'Si aún no ha exportado una copia de esta convocatoria, cancele y expórtela primero.\n¿Continuar?'
-    )) { return; }
-
-    App.store.muta(function (s) {
-      CENSOS.forEach(function (c) { c.fijar(s, {}); });
-      s.cargas = {};
+    App.ui.confirmar({
+      titulo: 'Borrar todos los censos',
+      parrafos: ['Se borrarán por completo:'],
+      lista: CENSOS
+        .filter(function (c) { return cuantos(c.id) > 0; })
+        .map(function (c) { return c.titulo + ' — ' + cuantos(c.id) + ' municipios'; }),
+      aviso: 'Las tarifas se conservan. Si aún no ha exportado una copia de esta convocatoria, cancele y expórtela primero.',
+      textoConfirmar: 'Borrar los censos',
+      peligro: true,
+      alConfirmar: function () {
+        App.store.muta(function (s) {
+          CENSOS.forEach(function (c) { c.fijar(s, {}); });
+          s.cargas = {};
+        });
+        ultima = null;
+        App.ui.flotante('Censos borrados. Las tarifas siguen configuradas.');
+        App.render();
+      }
     });
-    ultima = null;
-    App.ui.flotante('Censos borrados. Las tarifas siguen configuradas.');
-    App.render();
   }
 
   function tarjetaConvocatoria() {
@@ -2595,15 +2744,21 @@ tfoot td {
         el('button', {
           class: 'btn fantasma pequeno',
           onClick: function () {
-            if (window.confirm(
-              'Se borrarán las tarifas Y todos los censos, dejando la aplicación como recién instalada.\n\n' +
-              '¿Continuar?'
-            )) {
-              App.store.reiniciar();
-              ultima = null;
-              App.ui.flotante('Aplicación reiniciada por completo');
-              App.render();
-            }
+            App.ui.confirmar({
+              titulo: 'Reiniciar la aplicación entera',
+              parrafos: [
+                'Se borrarán las tarifas y todos los censos, dejando la aplicación como recién instalada.'
+              ],
+              aviso: 'Esto no se puede deshacer salvo restaurando una copia JSON.',
+              textoConfirmar: 'Reiniciar todo',
+              peligro: true,
+              alConfirmar: function () {
+                App.store.reiniciar();
+                ultima = null;
+                App.ui.flotante('Aplicación reiniciada por completo');
+                App.render();
+              }
+            });
           }
         }, 'Reiniciar también las tarifas')
       ])
@@ -3240,6 +3395,60 @@ tfoot td {
     return partes.join(' · ');
   }
 
+  /* Construye el informe como documento suelto, con el mismo aspecto que tendría
+     impreso. Hace falta porque dentro de un iframe con sandbox el navegador
+     ignora window.print(): allí se abre en una pestaña propia, donde el usuario
+     ya puede imprimir o guardar como PDF con normalidad. */
+  function documentoImprimible() {
+    var estilos = '';
+    document.querySelectorAll('style').forEach(function (s) { estilos += s.textContent; });
+
+    var copia = document.querySelector('.contenido').cloneNode(true);
+    copia.querySelectorAll('.no-imprimir').forEach(function (n) { n.remove(); });
+    copia.querySelectorAll('.tabla-scroll').forEach(function (n) {
+      n.classList.remove('alta');
+      n.style.maxHeight = 'none';
+      n.style.overflow = 'visible';
+    });
+
+    return '<!doctype html><html lang="es"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+      '<title>' + (App.store.estado().convocatoria || 'Informe de gastos') + '</title>' +
+      '<style>' + estilos +
+      /* En el documento suelto lo de impresión se ve también en pantalla. */
+      '.solo-impresion{display:block !important}' +
+      'body{background:#fff;padding:24px}' +
+      '.contenido{max-width:none;padding:0}' +
+      '</style></head><body>' + copia.outerHTML + '</body></html>';
+  }
+
+  function exportarPDF() {
+    if (!App.ui.enMarco()) {
+      window.print();
+      return;
+    }
+
+    /* Vista previa dentro de un marco: se abre el informe aparte. */
+    var blob = new Blob([documentoImprimible()], { type: 'text/html;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var ventana = window.open(url, '_blank');
+
+    if (ventana) {
+      App.ui.flotante('Informe abierto en una pestaña nueva. Use Imprimir → Guardar como PDF.');
+      setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      return;
+    }
+
+    /* Sin permiso para abrir pestañas, queda descargarlo. */
+    URL.revokeObjectURL(url);
+    App.ui.descargar(
+      'informe-' + new Date().toISOString().slice(0, 10) + '.html',
+      documentoImprimible(),
+      'text/html'
+    );
+    App.ui.flotante('Informe descargado en HTML. Ábralo y use Imprimir → Guardar como PDF.');
+  }
+
   function cabeceraInforme(informe) {
     var estado = App.store.estado();
 
@@ -3263,7 +3472,7 @@ tfoot td {
         el('div', { class: 'fila' }, [
           el('button', {
             class: 'btn',
-            onClick: function () { window.print(); }
+            onClick: exportarPDF
           }, [icono('imprimir', 16), 'Exportar a PDF'])
         ])
       ])

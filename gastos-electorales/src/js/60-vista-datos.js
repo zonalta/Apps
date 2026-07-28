@@ -268,13 +268,29 @@
       ]));
     }
 
+    /* Se listan TODAS, no una muestra: para arreglar el fichero hay que saber
+       exactamente qué filas se quedaron fuera. */
     if (res.noReconocidos.length) {
       partes.push(el('div', { class: 'aviso' }, [
         icono('aviso'),
-        el('div', {}, [
-          el('strong', { text: res.noReconocidos.length + ' fila(s) sin municipio reconocible. ' }),
-          'Se han ignorado: ' + res.noReconocidos.slice(0, 8).join(', ') +
-            (res.noReconocidos.length > 8 ? '…' : '')
+        el('div', { style: 'min-width:0;flex:1' }, [
+          el('strong', { text: res.noReconocidos.length + ' fila(s) sin municipio reconocible, ignoradas. ' }),
+          'Revise cómo está escrito el municipio en estas filas:',
+          el('ul', { class: 'lista-rechazos' },
+            res.noReconocidos.map(function (t) { return el('li', { text: t }); })
+          ),
+          el('button', {
+            class: 'btn secundario pequeno',
+            style: 'margin-top:10px',
+            onClick: function () {
+              App.ui.descargar(
+                'filas-no-reconocidas.csv',
+                App.ui.aCSV([['VALOR EN EL FICHERO']].concat(
+                  res.noReconocidos.map(function (t) { return [t]; })
+                ))
+              );
+            }
+          }, [icono('descarga', 14), 'Descargar la lista'])
         ])
       ]));
     }
@@ -333,18 +349,23 @@
   /* ---------- Estado de los censos ---------- */
 
   function borrarCenso(c) {
-    var n = cuantos(c.id);
-    if (!window.confirm(
-      'Se borrarán los datos de «' + c.titulo + '» (' + n + ' municipios).\n\n' +
-      'Las tarifas de la configuración no se tocan.\n¿Continuar?'
-    )) { return; }
-
-    App.store.muta(function (s) {
-      c.fijar(s, {});
-      delete s.cargas[c.id];
+    App.ui.confirmar({
+      titulo: 'Borrar «' + c.titulo + '»',
+      parrafos: [
+        'Se borrarán los datos de ' + cuantos(c.id) + ' municipios de este censo.',
+        'Las tarifas de la configuración no se tocan, y los demás censos se quedan como están.'
+      ],
+      textoConfirmar: 'Borrar el censo',
+      peligro: true,
+      alConfirmar: function () {
+        App.store.muta(function (s) {
+          c.fijar(s, {});
+          delete s.cargas[c.id];
+        });
+        App.ui.flotante('Datos de «' + c.titulo + '» borrados');
+        App.render();
+      }
     });
-    App.ui.flotante('Datos de «' + c.titulo + '» borrados');
-    App.render();
   }
 
   function tarjetaCensos() {
@@ -517,24 +538,25 @@
   }
 
   function borrarTodosLosCensos() {
-    var detalle = CENSOS
-      .filter(function (c) { return cuantos(c.id) > 0; })
-      .map(function (c) { return '· ' + c.titulo + ': ' + cuantos(c.id) + ' municipios'; })
-      .join('\n');
-
-    if (!window.confirm(
-      'Se borrarán todos los censos cargados:\n\n' + detalle + '\n\n' +
-      'Las tarifas de la configuración se conservan.\n\n' +
-      'Si aún no ha exportado una copia de esta convocatoria, cancele y expórtela primero.\n¿Continuar?'
-    )) { return; }
-
-    App.store.muta(function (s) {
-      CENSOS.forEach(function (c) { c.fijar(s, {}); });
-      s.cargas = {};
+    App.ui.confirmar({
+      titulo: 'Borrar todos los censos',
+      parrafos: ['Se borrarán por completo:'],
+      lista: CENSOS
+        .filter(function (c) { return cuantos(c.id) > 0; })
+        .map(function (c) { return c.titulo + ' — ' + cuantos(c.id) + ' municipios'; }),
+      aviso: 'Las tarifas se conservan. Si aún no ha exportado una copia de esta convocatoria, cancele y expórtela primero.',
+      textoConfirmar: 'Borrar los censos',
+      peligro: true,
+      alConfirmar: function () {
+        App.store.muta(function (s) {
+          CENSOS.forEach(function (c) { c.fijar(s, {}); });
+          s.cargas = {};
+        });
+        ultima = null;
+        App.ui.flotante('Censos borrados. Las tarifas siguen configuradas.');
+        App.render();
+      }
     });
-    ultima = null;
-    App.ui.flotante('Censos borrados. Las tarifas siguen configuradas.');
-    App.render();
   }
 
   function tarjetaConvocatoria() {
@@ -575,15 +597,21 @@
         el('button', {
           class: 'btn fantasma pequeno',
           onClick: function () {
-            if (window.confirm(
-              'Se borrarán las tarifas Y todos los censos, dejando la aplicación como recién instalada.\n\n' +
-              '¿Continuar?'
-            )) {
-              App.store.reiniciar();
-              ultima = null;
-              App.ui.flotante('Aplicación reiniciada por completo');
-              App.render();
-            }
+            App.ui.confirmar({
+              titulo: 'Reiniciar la aplicación entera',
+              parrafos: [
+                'Se borrarán las tarifas y todos los censos, dejando la aplicación como recién instalada.'
+              ],
+              aviso: 'Esto no se puede deshacer salvo restaurando una copia JSON.',
+              textoConfirmar: 'Reiniciar todo',
+              peligro: true,
+              alConfirmar: function () {
+                App.store.reiniciar();
+                ultima = null;
+                App.ui.flotante('Aplicación reiniciada por completo');
+                App.render();
+              }
+            });
           }
         }, 'Reiniciar también las tarifas')
       ])

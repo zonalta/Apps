@@ -151,6 +151,22 @@ combinada de representantes y mesas, y la de policía. Si los efectivos llegan a
 tiempo, basta con añadir la columna `EFECTIVOS` al fichero maestro y no hace
 falta el segundo.
 
+## La aplicación no usa diálogos del navegador
+
+Ni `confirm`, ni `alert`, ni `print` directo. Cuando la página va dentro de un
+iframe con `sandbox` —como la vista previa publicada— el navegador **ignora esas
+llamadas en silencio**: `confirm()` devuelve `false` sin mostrar nada, así que
+cualquier acción que dependiera de ella quedaba muerta sin dar señal.
+
+- Las confirmaciones usan `App.ui.confirmar()`, un diálogo propio.
+- «Exportar a PDF» llama a `window.print()` sólo cuando la página es de primer
+  nivel. Dentro de un marco genera el informe como documento suelto y lo abre en
+  otra pestaña, donde imprimir funciona con normalidad; si tampoco se pueden
+  abrir pestañas, lo descarga en HTML.
+
+Al añadir interacciones nuevas conviene respetar esta regla: las descargas y
+`localStorage` sí funcionan dentro del marco, los diálogos nativos no.
+
 ## Reutilizar la herramienta en otra convocatoria
 
 Los censos (mesas, representantes, policía) cambian enteros de un proceso a otro;

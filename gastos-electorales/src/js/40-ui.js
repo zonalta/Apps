@@ -160,6 +160,81 @@
     return contenedor;
   }
 
+  /* Diálogo de confirmación propio.
+     No se usa window.confirm porque cuando la página va dentro de un iframe con
+     sandbox —como la vista previa— el navegador ignora la llamada y devuelve
+     false sin avisar, de modo que toda acción que dependiera de ella quedaba
+     muerta en silencio. Lo mismo vale para alert() y print(). */
+  function confirmar(opciones) {
+    var previo = document.querySelector('.velo-modal');
+    if (previo) { previo.remove(); }
+
+    var devuelto = false;
+    function cerrar(aceptado) {
+      if (devuelto) { return; }
+      devuelto = true;
+      document.removeEventListener('keydown', alPulsar, true);
+      velo.remove();
+      if (aceptado && opciones.alConfirmar) { opciones.alConfirmar(); }
+    }
+
+    function alPulsar(e) {
+      if (e.key === 'Escape') { e.preventDefault(); cerrar(false); }
+    }
+
+    var botonConfirmar = el('button', {
+      class: 'btn' + (opciones.peligro ? ' peligro-solido' : ''),
+      onClick: function () { cerrar(true); }
+    }, opciones.textoConfirmar || 'Confirmar');
+
+    var cuerpo = [
+      el('h2', { id: 'titulo-modal', text: opciones.titulo })
+    ];
+    (opciones.parrafos || []).forEach(function (p) {
+      cuerpo.push(el('p', { text: p }));
+    });
+    if (opciones.lista && opciones.lista.length) {
+      cuerpo.push(el('ul', { class: 'lista-modal' }, opciones.lista.map(function (t) {
+        return el('li', { text: t });
+      })));
+    }
+    if (opciones.aviso) {
+      cuerpo.push(el('p', { class: 'nota-modal', text: opciones.aviso }));
+    }
+
+    var dialogo = el('div', {
+      class: 'modal',
+      role: 'dialog',
+      'aria-modal': 'true',
+      'aria-labelledby': 'titulo-modal',
+      onClick: function (e) { e.stopPropagation(); }
+    }, [
+      el('div', { class: 'cuerpo-modal' }, cuerpo),
+      el('div', { class: 'pie-modal' }, [
+        el('button', {
+          class: 'btn secundario',
+          onClick: function () { cerrar(false); }
+        }, opciones.textoCancelar || 'Cancelar'),
+        botonConfirmar
+      ])
+    ]);
+
+    var velo = el('div', {
+      class: 'velo-modal',
+      onClick: function () { cerrar(false); }
+    }, [dialogo]);
+
+    document.body.appendChild(velo);
+    document.addEventListener('keydown', alPulsar, true);
+    botonConfirmar.focus();
+  }
+
+  /* Dentro de un iframe con sandbox el navegador también ignora window.print(),
+     así que hace falta saberlo para ofrecer otra salida. */
+  function enMarco() {
+    try { return window.self !== window.top; } catch (e) { return true; }
+  }
+
   var temporizadorAviso = null;
   function flotante(mensaje, esError) {
     var previo = document.querySelector('.aviso-flotante');
@@ -206,6 +281,8 @@
     fecha: fecha,
     porcentaje: porcentaje,
     barras: barras,
+    confirmar: confirmar,
+    enMarco: enMarco,
     flotante: flotante,
     descargar: descargar,
     aCSV: aCSV

@@ -507,3 +507,53 @@ tfoot td {
   background: var(--surface-low);
 }
 .ficha-censo .entre { width: 100%; }
+
+/* ---------- Diálogo de confirmación ---------- */
+
+.velo-modal {
+  position: fixed; inset: 0; z-index: 80;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  background: rgba(25, 28, 33, 0.45);
+  backdrop-filter: blur(4px);
+}
+.modal {
+  width: min(480px, 100%);
+  background: var(--surface);
+  border-radius: var(--radio-lg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+.cuerpo-modal { padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+.cuerpo-modal h2 { color: var(--primary); }
+.cuerpo-modal p { color: var(--on-surface-variant); line-height: 1.55; }
+.lista-modal {
+  margin: 0; padding: 12px 14px 12px 30px;
+  background: var(--surface-low);
+  border: 1px solid var(--outline);
+  border-radius: var(--radio);
+  color: var(--on-surface);
+}
+.lista-modal li { margin: 3px 0; }
+.nota-modal {
+  padding: 10px 12px; border-radius: var(--radio);
+  background: var(--warning-container);
+  color: var(--on-warning-container) !important;
+  font-size: 13px;
+}
+.pie-modal {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 16px 24px;
+  background: var(--surface-low);
+  border-top: 1px solid var(--outline);
+}
+.btn.peligro-solido { background: var(--error); color: #fff; border-color: var(--error); }
+.btn.peligro-solido:hover { background: #8f1414; }
+
+.lista-rechazos {
+  margin: 8px 0 0; padding: 8px 12px 8px 26px;
+  max-height: 200px; overflow-y: auto;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: var(--radio);
+}
+.lista-rechazos li { margin: 2px 0; font-variant-numeric: tabular-nums; }

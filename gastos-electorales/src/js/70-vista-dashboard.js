@@ -611,6 +611,60 @@
     return partes.join(' · ');
   }
 
+  /* Construye el informe como documento suelto, con el mismo aspecto que tendría
+     impreso. Hace falta porque dentro de un iframe con sandbox el navegador
+     ignora window.print(): allí se abre en una pestaña propia, donde el usuario
+     ya puede imprimir o guardar como PDF con normalidad. */
+  function documentoImprimible() {
+    var estilos = '';
+    document.querySelectorAll('style').forEach(function (s) { estilos += s.textContent; });
+
+    var copia = document.querySelector('.contenido').cloneNode(true);
+    copia.querySelectorAll('.no-imprimir').forEach(function (n) { n.remove(); });
+    copia.querySelectorAll('.tabla-scroll').forEach(function (n) {
+      n.classList.remove('alta');
+      n.style.maxHeight = 'none';
+      n.style.overflow = 'visible';
+    });
+
+    return '<!doctype html><html lang="es"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+      '<title>' + (App.store.estado().convocatoria || 'Informe de gastos') + '</title>' +
+      '<style>' + estilos +
+      /* En el documento suelto lo de impresión se ve también en pantalla. */
+      '.solo-impresion{display:block !important}' +
+      'body{background:#fff;padding:24px}' +
+      '.contenido{max-width:none;padding:0}' +
+      '</style></head><body>' + copia.outerHTML + '</body></html>';
+  }
+
+  function exportarPDF() {
+    if (!App.ui.enMarco()) {
+      window.print();
+      return;
+    }
+
+    /* Vista previa dentro de un marco: se abre el informe aparte. */
+    var blob = new Blob([documentoImprimible()], { type: 'text/html;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var ventana = window.open(url, '_blank');
+
+    if (ventana) {
+      App.ui.flotante('Informe abierto en una pestaña nueva. Use Imprimir → Guardar como PDF.');
+      setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      return;
+    }
+
+    /* Sin permiso para abrir pestañas, queda descargarlo. */
+    URL.revokeObjectURL(url);
+    App.ui.descargar(
+      'informe-' + new Date().toISOString().slice(0, 10) + '.html',
+      documentoImprimible(),
+      'text/html'
+    );
+    App.ui.flotante('Informe descargado en HTML. Ábralo y use Imprimir → Guardar como PDF.');
+  }
+
   function cabeceraInforme(informe) {
     var estado = App.store.estado();
 
@@ -634,7 +688,7 @@
         el('div', { class: 'fila' }, [
           el('button', {
             class: 'btn',
-            onClick: function () { window.print(); }
+            onClick: exportarPDF
           }, [icono('imprimir', 16), 'Exportar a PDF'])
         ])
       ])
