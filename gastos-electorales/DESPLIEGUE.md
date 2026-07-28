@@ -1,5 +1,111 @@
 # Desplegar en Cloud Run
 
+## Configurar la base de datos y el acceso
+
+Se hace una sola vez, después del primer despliegue.
+
+### 1. Firestore
+
+```bash
+PROYECTO=gen-lang-client-0903107323
+gcloud config set project $PROYECTO
+gcloud services enable firestore.googleapis.com
+
+# Base de datos en modo nativo, en la misma región que el servicio
+gcloud firestore databases create --location=europe-southwest1
+```
+
+La cuenta con la que corre Cloud Run necesita poder escribir:
+
+```bash
+NUMERO=$(gcloud projects describe $PROYECTO --format='value(projectNumber)')
+gcloud projects add-iam-policy-binding $PROYECTO \
+  --member="serviceAccount:$NUMERO-compute@developer.gserviceaccount.com" \
+  --role=roles/datastore.user --condition=None
+```
+
+### 2. Identificador de cliente de Google
+
+En la consola, **Google Auth Platform** (antes «Pantalla de consentimiento de
+OAuth»; Google rediseñó esta sección, así que las guías antiguas mandan a un menú
+que ya no existe).
+
+**Información de la marca**
+
+- Nombre de la aplicación: `Gestión Electoral`
+- Correo de asistencia y contacto del desarrollador: el tuyo
+
+**Público**
+
+- Tipo de usuario: **Externo**
+- Si el estado es «Prueba», pulsar **Publicar app** para pasarlo a «En
+  producción». Con ámbitos básicos Google no revisa nada y el cambio es
+  inmediato; en «Prueba» sólo entrarían los usuarios de prueba listados a mano.
+
+**Acceso a los datos**
+
+- No añadir ningún ámbito. Sólo se usa la identidad, incluida de serie.
+
+**Clientes → Crear cliente**
+
+- Tipo: **Aplicación web**
+- Orígenes autorizados de JavaScript: la URL de Cloud Run, sin barra final
+  (`https://gestion-electoral-635475980649.europe-southwest1.run.app`)
+- URIs de redirección: vacío
+
+Copia el **ID de cliente** (acaba en `.apps.googleusercontent.com`). Es público
+por diseño: identifica a la aplicación, no autoriza a nadie. El secreto que
+Google genera al lado **no se usa**.
+
+### 3. Decir al servicio quién puede entrar
+
+```bash
+gcloud run services update gestion-electoral \
+  --region europe-southwest1 \
+  --update-env-vars \
+GOOGLE_CLIENT_ID=EL_ID_DE_CLIENTE,\
+CORREOS_AUTORIZADOS=zonalta@gmail.com
+```
+
+Para dar acceso a más gente, se repite el comando con los correos separados por
+comas. Para quitárselo a alguien, se repite sin él: el cambio es inmediato.
+
+Comprobación:
+
+```bash
+curl https://TU-URL/_salud
+# {"estado":"ok","almacen":"firestore","autenticacion":"configurada"}
+```
+
+### Por qué el servicio sigue siendo público en Cloud Run
+
+Puede chocar, así que conviene explicarlo. Si se cerrara el servicio con IAM
+(`--no-allow-unauthenticated`), Cloud Run rechazaría la petición **antes** de
+servir nada, y el navegador no podría ni cargar la pantalla de acceso: haría
+falta un proxy autenticado para abrirla, lo que la vuelve inservible desde el
+iPad.
+
+La protección está una capa más arriba, en la aplicación: sin una sesión de
+Google válida y con el correo en la lista, la API no devuelve ni un dato. Lo
+único que se puede ver sin identificarse es la pantalla de acceso.
+
+Son dos cosas distintas y ambas necesarias: **Google comprueba quién eres**, y
+`CORREOS_AUTORIZADOS` decide **si tú puedes entrar**. Que cualquiera pueda
+iniciar sesión con su Google no le da acceso a nada.
+
+## Variables del servicio
+
+| Variable | Para qué | Obligatoria |
+|---|---|---|
+| `GOOGLE_CLIENT_ID` | Identificador de cliente OAuth | Sí |
+| `CORREOS_AUTORIZADOS` | Correos con acceso, separados por comas | Sí |
+| `ALMACEN` | `firestore` (por defecto) o `memoria` para desarrollo | No |
+| `AUTH_MODO` | `google` (por defecto) o `desarrollo`, que salta la verificación | No |
+
+`AUTH_MODO=desarrollo` **no puede usarse en Cloud Run**: el servidor detecta que
+está desplegado y se niega a arrancar. Es un cierre deliberado, para que un
+descuido en el despliegue no deje la aplicación abierta.
+
 ## Antes de empezar: dos aclaraciones
 
 **El nombre del servicio no puede ser «Gestión Electoral».** Cloud Run sólo admite
@@ -7,13 +113,10 @@ minúsculas, números y guiones, sin acentos ni espacios. El servicio se llama
 **`gestion-electoral`**; «Gestión Electoral» es el nombre de la aplicación y el
 que aparece dentro de ella.
 
-**Desplegar da una URL compartida, pero todavía no datos compartidos.** La
-aplicación guarda los censos en el navegador (`localStorage`), así que cada
-dispositivo mantiene los suyos: lo que cargues en el iPad no aparecerá en el
-ordenador del trabajo. Para eso hace falta backend y base de datos, que es el
-paso siguiente. Lo que sí resuelve este despliegue es tener **una sola URL, con
-la misma versión de la aplicación en todos los dispositivos**, sin depender de
-la vista previa.
+**Los datos viven en Firestore y se comparten entre dispositivos.** El navegador
+guarda una copia que sólo sirve de respaldo si se cae la conexión. Si la
+aplicación se abre sin servidor detrás —fichero suelto o vista previa— funciona
+igual pero en modo local, y lo dice en la barra lateral.
 
 ## Datos que hace falta tener a mano
 
@@ -44,7 +147,7 @@ gcloud run deploy gestion-electoral \
   --source gastos-electorales \
   --region europe-southwest1 \
   --port 8080 \
-  --memory 256Mi \
+  --memory 512Mi \
   --min-instances 0 \
   --max-instances 3 \
   --allow-unauthenticated
@@ -62,33 +165,17 @@ curl https://TU-URL/_salud     # {"estado":"ok","version":"gestion-electoral-000
 
 ## Sobre el acceso público
 
-`--allow-unauthenticated` deja la URL abierta a cualquiera que la conozca. Hoy
-eso expone **la aplicación, no los datos**: los censos viven en el navegador de
-cada usuario y el servidor no guarda nada ni tiene API.
+`--allow-unauthenticated` es **necesario** y no es un descuido: sin él, Cloud Run
+rechazaría la petición antes de servir la pantalla de acceso. Está explicado más
+arriba, en «Por qué el servicio sigue siendo público en Cloud Run».
 
-Si prefieres cerrarla desde el principio, quita esa opción y añade acceso por
-usuario:
-
-```bash
-gcloud run services remove-iam-policy-binding gestion-electoral \
-  --region europe-southwest1 --member=allUsers --role=roles/run.invoker
-
-gcloud run services add-iam-policy-binding gestion-electoral \
-  --region europe-southwest1 \
-  --member=user:zonalta@gmail.com --role=roles/run.invoker
-```
-
-El inconveniente: para abrirla desde el iPad haría falta pasar por
-[Cloud Run proxy](https://cloud.google.com/run/docs/authenticating/end-users) o
-poner delante un balanceador con IAP, que ya es montaje serio.
-
-**En el momento en que los datos pasen al servidor, cerrar el acceso deja de ser
-opcional.** Conviene tenerlo presente al planificar ese paso.
+Lo que protege los datos es la sesión de Google más la lista de correos
+autorizados. Sin las dos cosas, la API no devuelve nada.
 
 ## Coste
 
 El servicio escala a cero: sin visitas, no hay instancias y no se factura. Con
-256 MiB, un uso de unas pocas personas cabe de sobra en la
+512 MiB, un uso de unas pocas personas cabe de sobra en la
 [capa gratuita mensual](https://cloud.google.com/run/pricing) de Cloud Run.
 El gasto realista es de céntimos, sobre todo por el almacenamiento de la imagen
 en Artifact Registry.

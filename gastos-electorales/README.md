@@ -8,14 +8,19 @@ organizado por la estructura territorial canaria: **provincia → isla → munic
 Aplicación funcional que se ejecuta entera en el navegador, lista para desplegar
 en Cloud Run como servicio `gestion-electoral` (ver **[DESPLIEGUE.md](DESPLIEGUE.md)**).
 
-Los datos se guardan en `localStorage`, es decir **por dispositivo**: desplegarla
-da una URL común con la misma versión en todos los sitios, pero lo cargado en el
-iPad todavía no aparece en el ordenador. La pantalla «Carga de Datos» incluye
-exportar/restaurar una copia en JSON para salvar ese hueco mientras tanto.
+Los datos viven en **Firestore** y se comparten entre dispositivos. El acceso
+exige **iniciar sesión con una cuenta de Google autorizada**: sin ella la API no
+devuelve nada.
 
-Compartir los datos de verdad requiere backend y base de datos, y es el paso
-siguiente. En cuanto los datos vivan en el servidor, cerrar el acceso al servicio
-deja de ser opcional.
+La aplicación detecta sola en qué situación está:
+
+| Situación | Comportamiento |
+|---|---|
+| Servida por su servidor | Pide sesión, datos en Firestore, compartidos |
+| Fichero suelto o vista previa | Modo local: datos sólo en ese navegador, avisado en la barra lateral |
+
+El navegador guarda siempre una copia de respaldo, que se usa si el servidor no
+responde. La barra lateral dice en todo momento si lo que se ve está guardado.
 
 ## Cómo se ejecuta
 
@@ -37,15 +42,20 @@ No hay dependencias ni `node_modules`: `build.js` sólo concatena `src/`.
 | Fichero | Responsabilidad |
 |---|---|
 | `src/js/00-geo.js` | Los 88 municipios de Canarias con su isla y provincia, y el reconocimiento de nombres al importar |
-| `src/js/10-state.js` | Estado, persistencia y catálogo de tipologías de colaborador |
+| `src/js/05-api.js` | Comunicación con el servidor y sesión de Google |
+| `src/js/10-state.js` | Estado, sincronización y catálogo de tipologías de colaborador |
 | `src/js/20-parsers.js` | Lectura de CSV y XLSX |
 | `src/js/30-calc.js` | Motor de cálculo — **todo el dinero se calcula aquí** |
 | `src/js/40-ui.js` | Formato, construcción de nodos y gráficas de barras |
 | `src/js/50-vista-config.js` | Configuración de importes |
 | `src/js/60-vista-datos.js` | Carga de ficheros, estado de los censos y copia de seguridad |
 | `src/js/70-vista-dashboard.js` | Filtros, indicadores, gráficas y tablas |
+| `src/js/80-sesion.js` | Pantalla de acceso, indicador de sincronización y conflictos |
 | `src/js/90-app.js` | Navegación y arranque |
-| `server.js` | Servidor estático sin dependencias, para Cloud Run |
+| `server.js` | Servidor: estáticos y API |
+| `servidor/almacen.js` | Persistencia (Firestore o memoria) con control de versiones |
+| `servidor/autenticacion.js` | Verificación de la cuenta de Google y lista de autorizados |
+| `servidor/api.js` | Rutas de la API |
 | `Dockerfile` | Compilación en dos etapas: genera `dist/` y sirve sólo lo necesario |
 
 ## Reglas de cálculo implementadas
@@ -208,8 +218,7 @@ impresión con una hoja preparada: título, convocatoria, fecha de generación,
 
 ## Pendiente
 
-- Backend y base de datos, para que los datos se compartan entre dispositivos
-  (el despliegue en Cloud Run ya está preparado; falta la parte de servidor).
+
 - Colegios electorales como nivel entre municipio y mesa; con ellos, los
   coordinadores de tablets dejarían de ser un importe suelto.
 - Historial de informes generados.

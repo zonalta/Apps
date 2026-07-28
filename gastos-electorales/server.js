@@ -1,14 +1,20 @@
-/* Servidor estático mínimo para Cloud Run.
-   Sin dependencias: la aplicación es un único HTML autocontenido, así que todo
-   lo que hace falta es entregarlo con las cabeceras correctas. */
+/* Servidor de Gestión Electoral para Cloud Run.
+   Sirve la aplicación y la API de datos. */
 'use strict';
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+const { crearAlmacen } = require('./servidor/almacen');
+const { crearApi } = require('./servidor/api');
+const autenticacion = require('./servidor/autenticacion');
+
 const PUERTO = process.env.PORT || 8080;
 const RAIZ = path.join(__dirname, 'dist');
+
+const almacen = crearAlmacen();
+const api = crearApi(almacen);
 
 const TIPOS = {
   '.html': 'text/html; charset=utf-8',
@@ -20,16 +26,17 @@ const TIPOS = {
   '.ico': 'image/x-icon'
 };
 
-/* La página es autocontenida: no carga nada de fuera ni llama a ningún servidor.
-   La política lo refleja, de modo que si algún día se colase una referencia
-   externa el navegador la bloquearía en vez de cargarla en silencio. */
+/* La página no carga nada de fuera salvo el botón de acceso de Google, que
+   necesita su script y su iframe. Todo lo demás sigue bloqueado, de modo que
+   cualquier referencia externa que se colase por error no llegaría a cargarse. */
 const CSP = [
   "default-src 'none'",
-  "script-src 'self' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
+  "script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client",
+  "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
+  "frame-src https://accounts.google.com/gsi/",
+  "connect-src 'self' https://accounts.google.com/gsi/",
+  "img-src 'self' data: https://lh3.googleusercontent.com",
   "font-src 'self' data:",
-  "connect-src 'self'",
   "form-action 'none'",
   "base-uri 'none'",
   "frame-ancestors 'none'"
@@ -40,31 +47,14 @@ function cabeceras(rutaFichero) {
   return {
     'Content-Type': TIPOS[ext] || 'application/octet-stream',
     /* El HTML no se cachea para que un despliegue nuevo se vea al recargar. */
-    'Cache-Control': ext === '.html'
-      ? 'no-cache, must-revalidate'
-      : 'public, max-age=3600',
+    'Cache-Control': ext === '.html' ? 'no-cache, must-revalidate' : 'public, max-age=3600',
     'Content-Security-Policy': CSP,
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'same-origin'
   };
 }
 
-const servidor = http.createServer((req, res) => {
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8', Allow: 'GET, HEAD' });
-    res.end('Método no permitido');
-    return;
-  }
-
-  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-
-  /* Sonda de vida para Cloud Run y para comprobar despliegues. */
-  if (url.pathname === '/_salud') {
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ estado: 'ok', version: process.env.K_REVISION || 'local' }));
-    return;
-  }
-
+function servirEstatico(req, res, url) {
   let relativa = decodeURIComponent(url.pathname);
   if (relativa === '/' || relativa === '') { relativa = '/index.html'; }
 
@@ -94,10 +84,40 @@ const servidor = http.createServer((req, res) => {
     res.writeHead(200, cabeceras(destino));
     res.end(req.method === 'HEAD' ? undefined : contenido);
   });
+}
+
+const servidor = http.createServer(async (req, res) => {
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+
+  /* Sonda de vida para Cloud Run. No revela nada del estado de los datos. */
+  if (url.pathname === '/_salud') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({
+      estado: 'ok',
+      version: process.env.K_REVISION || 'local',
+      almacen: almacen.tipo,
+      autenticacion: autenticacion.configurado() ? 'configurada' : 'sin configurar'
+    }));
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/')) {
+    if (await api(req, res, url)) { return; }
+  }
+
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8', Allow: 'GET, HEAD' });
+    res.end('Método no permitido');
+    return;
+  }
+
+  servirEstatico(req, res, url);
 });
 
 servidor.listen(PUERTO, '0.0.0.0', () => {
   console.log(`Gestión Electoral escuchando en el puerto ${PUERTO}`);
+  console.log(`  almacén: ${almacen.tipo}`);
+  console.log(`  autenticación: ${autenticacion.configurado() ? 'configurada' : 'SIN CONFIGURAR'}`);
 });
 
 /* Cloud Run envía SIGTERM al retirar una instancia. */
