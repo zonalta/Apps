@@ -1,0 +1,12 @@
+{
+  "name": "gestion-electoral",
+  "version": "1.0.0",
+  "description": "Cálculo e informes de gastos de colaboradores de procesos electorales en Canarias",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node build.js",
+    "start": "node server.js",
+    "dev": "node build.js && node server.js"
+  }
+}

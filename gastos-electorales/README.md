@@ -5,18 +5,24 @@ organizado por la estructura territorial canaria: **provincia → isla → munic
 
 ## Estado actual
 
-Aplicación funcional que se ejecuta entera en el navegador. Los datos se guardan
-en `localStorage`, es decir **por dispositivo**: todavía no hay servidor, así que
-lo cargado en el iPad no aparece en el ordenador. La pantalla «Carga de Datos»
-incluye exportar/restaurar una copia en JSON para salvar ese hueco mientras tanto.
+Aplicación funcional que se ejecuta entera en el navegador, lista para desplegar
+en Cloud Run como servicio `gestion-electoral` (ver **[DESPLIEGUE.md](DESPLIEGUE.md)**).
 
-El siguiente paso previsto es empaquetar la app con un backend y desplegarla en
-Cloud Run, momento en el que los datos pasan a ser compartidos entre dispositivos.
+Los datos se guardan en `localStorage`, es decir **por dispositivo**: desplegarla
+da una URL común con la misma versión en todos los sitios, pero lo cargado en el
+iPad todavía no aparece en el ordenador. La pantalla «Carga de Datos» incluye
+exportar/restaurar una copia en JSON para salvar ese hueco mientras tanto.
+
+Compartir los datos de verdad requiere backend y base de datos, y es el paso
+siguiente. En cuanto los datos vivan en el servidor, cerrar el acceso al servicio
+deja de ser opcional.
 
 ## Cómo se ejecuta
 
 ```bash
 node build.js          # genera dist/ a partir de src/
+npm start              # sirve dist/ en http://localhost:8080
+npm run dev            # las dos cosas
 ```
 
 - `dist/index.html` — la aplicación completa en un único fichero. Se abre con
@@ -39,6 +45,8 @@ No hay dependencias ni `node_modules`: `build.js` sólo concatena `src/`.
 | `src/js/60-vista-datos.js` | Carga de ficheros, estado de los censos y copia de seguridad |
 | `src/js/70-vista-dashboard.js` | Filtros, indicadores, gráficas y tablas |
 | `src/js/90-app.js` | Navegación y arranque |
+| `server.js` | Servidor estático sin dependencias, para Cloud Run |
+| `Dockerfile` | Compilación en dos etapas: genera `dist/` y sirve sólo lo necesario |
 
 ## Reglas de cálculo implementadas
 
@@ -200,7 +208,8 @@ impresión con una hoja preparada: título, convocatoria, fecha de generación,
 
 ## Pendiente
 
-- Backend y despliegue en Cloud Run, para que los datos se compartan entre dispositivos.
+- Backend y base de datos, para que los datos se compartan entre dispositivos
+  (el despliegue en Cloud Run ya está preparado; falta la parte de servidor).
 - Colegios electorales como nivel entre municipio y mesa; con ellos, los
   coordinadores de tablets dejarían de ser un importe suelto.
 - Historial de informes generados.
