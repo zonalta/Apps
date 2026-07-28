@@ -472,15 +472,24 @@
     }
   }
 
-  function ordenarFilas(filas, columnas, ordenActivo) {
+  function ordenarFilas(filas, columnas, ordenActivo, pestana) {
     if (!ordenActivo) { return filas; }
+
+    /* Al ordenar el desglose "Por municipio" por isla, dentro de cada isla los
+       municipios se esperan en orden alfabético. Se consigue pre-ordenando por
+       nombre y ordenando después por isla con un sort estable: los empates
+       (mismos municipios de una isla) conservan ese orden alfabético previo. */
+    var base = (pestana === 'municipio' && ordenActivo.clave === 'isla')
+      ? App.geo.ordenarPorNombre(filas)
+      : filas;
+
     var col = columnas.filter(function (c) { return c.clave === ordenActivo.clave; })[0];
     var dir = ordenActivo.direccion === 'asc' ? 1 : -1;
-    return filas.slice().sort(function (a, b) {
+    return base.slice().sort(function (a, b) {
       var va = a[ordenActivo.clave];
       var vb = b[ordenActivo.clave];
       if (col && col.num) { return ((Number(va) || 0) - (Number(vb) || 0)) * dir; }
-      return String(va == null ? '' : va).localeCompare(String(vb == null ? '' : vb), 'es') * dir;
+      return App.geo.compararNombres(va == null ? '' : va, vb == null ? '' : vb) * dir;
     });
   }
 
@@ -489,7 +498,7 @@
     var termino = App.geo.normaliza(f.busquedaTabla);
     var datos = datosTabla(informe, f.pestana, termino);
     var ordenActivo = f.orden[f.pestana];
-    datos.filas = ordenarFilas(datos.filas, datos.columnas, ordenActivo);
+    datos.filas = ordenarFilas(datos.filas, datos.columnas, ordenActivo, f.pestana);
 
     var cuerpo = el('tbody');
     datos.filas.forEach(function (fila) {
