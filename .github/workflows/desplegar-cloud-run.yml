@@ -1,0 +1,61 @@
+# Despliegue automático de Gestión Electoral en Cloud Run.
+#
+# Requiere configurar antes, una sola vez, la federación de identidades con
+# GitHub (ver gastos-electorales/DESPLIEGUE.md). No usa claves descargadas.
+name: Desplegar en Cloud Run
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'gastos-electorales/**'
+      - '.github/workflows/desplegar-cloud-run.yml'
+  workflow_dispatch:
+
+env:
+  SERVICIO: gestion-electoral
+  REGION: ${{ vars.GCP_REGION || 'europe-southwest1' }}
+
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # necesario para la federación de identidades
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Comprobar que la aplicación compila
+        run: node build.js
+        working-directory: gastos-electorales
+
+      - name: Autenticarse en Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Desplegar
+        run: |
+          gcloud run deploy "$SERVICIO" \
+            --source gastos-electorales \
+            --region "$REGION" \
+            --platform managed \
+            --port 8080 \
+            --memory 256Mi \
+            --cpu 1 \
+            --min-instances 0 \
+            --max-instances 3 \
+            --allow-unauthenticated \
+            --quiet
+
+      - name: Comprobar que el servicio responde
+        run: |
+          URL=$(gcloud run services describe "$SERVICIO" --region "$REGION" --format='value(status.url)')
+          echo "Servicio desplegado en $URL"
+          curl -fsS "$URL/_salud" && echo
+          echo "Desplegado en $URL" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,3657 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#00346f">
+<meta name="description" content="Cálculo, listados e informes de los gastos de colaboradores de un proceso electoral en Canarias.">
+<title>Gestión Electoral — Gastos de colaboradores</title>
+<style>
+/* Sistema visual "Civic Authority" — tomado del prototipo de Stitch.
+   Es un diseño institucional que se compromete deliberadamente con el modo claro:
+   la neutralidad y la previsibilidad importan más aquí que adaptarse al tema del
+   dispositivo, así que se fija color-scheme y no se ofrece variante oscura. */
+:root {
+  color-scheme: light;
+
+  --primary: #00346f;
+  --primary-container: #004a99;
+  --surface-tint: #255dad;
+  --on-primary: #ffffff;
+  --secondary: #505f76;
+  --secondary-container: #d0e1fb;
+
+  --background: #f9f9ff;
+  --surface: #ffffff;
+  --surface-low: #f3f3fa;
+  --surface-container: #ededf5;
+
+  --on-surface: #191c21;
+  --on-surface-variant: #424751;
+  --muted: #737783;
+  --outline: #c2c6d3;
+  --outline-strong: #a9aebc;
+
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+  --good: #0f7a3d;
+  --good-container: #d8f2e3;
+  --warning-container: #fdefd2;
+  --on-warning-container: #6b4a04;
+
+  --serie: #255dad;
+  --serie-suave: #b7d3f6;
+  --gridline: #e6e7ee;
+
+  --radio: 4px;
+  --radio-lg: 8px;
+  --sombra: 0 4px 12px rgba(0, 0, 0, 0.04);
+  --sombra-flotante: 0 4px 12px rgba(0, 0, 0, 0.08);
+
+  --sidebar: 268px;
+  --filtros: 300px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--on-surface);
+  background: var(--background);
+  -webkit-text-size-adjust: 100%;
+}
+
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+h1 { font-size: 32px; line-height: 1.25; }
+h2 { font-size: 20px; }
+h3 { font-size: 15px; }
+p { margin: 0; }
+
+button { font: inherit; cursor: pointer; }
+a { color: var(--primary-container); }
+
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- Armazón ---------- */
+
+.app { display: flex; min-height: 100vh; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: none;
+  align-items: center; gap: 12px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--outline);
+}
+.topbar strong { color: var(--primary); font-size: 16px; }
+
+.sidebar {
+  width: var(--sidebar);
+  flex: 0 0 var(--sidebar);
+  background: var(--surface);
+  border-right: 1px solid var(--outline);
+  padding: 24px 16px;
+  display: flex; flex-direction: column; gap: 24px;
+  position: sticky; top: 0; height: 100vh;
+}
+.marca-titulo { color: var(--primary); font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.marca-sub {
+  color: var(--muted); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px;
+}
+
+.nav { display: flex; flex-direction: column; gap: 4px; }
+.nav button {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; text-align: left;
+  padding: 10px 12px;
+  border: 0; border-radius: var(--radio);
+  background: transparent; color: var(--on-surface-variant);
+  font-weight: 500;
+}
+.nav button:hover { background: var(--surface-low); }
+.nav button[aria-current="page"] {
+  background: var(--secondary-container);
+  color: var(--primary); font-weight: 600;
+}
+.nav .ico { width: 20px; flex: 0 0 20px; opacity: 0.85; }
+
+.principal { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.contenido { flex: 1; padding: 32px; max-width: 1400px; width: 100%; }
+
+.cabecera-pagina { margin-bottom: 28px; }
+.cabecera-pagina p { color: var(--on-surface-variant); margin-top: 6px; font-size: 15px; }
+
+.pie {
+  border-top: 1px solid var(--outline);
+  padding: 16px 32px;
+  color: var(--muted); font-size: 12px;
+  display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+
+/* ---------- Piezas ---------- */
+
+.tarjeta {
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: var(--radio-lg);
+  box-shadow: var(--sombra);
+  padding: 24px;
+}
+.tarjeta > header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+  padding-bottom: 14px; margin-bottom: 20px;
+  border-bottom: 1px solid var(--outline);
+}
+.tarjeta > header h2 { color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+.rejilla { display: grid; gap: 24px; }
+.rejilla.dos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.rejilla.tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rejilla.cuatro { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.rejilla.principal-lateral { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+
+.kpi { display: flex; flex-direction: column; gap: 6px; }
+.kpi .etiqueta {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--muted);
+}
+.kpi .valor {
+  font-size: clamp(22px, 1.9vw, 28px);
+  font-weight: 700; letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.kpi .valor.destacado { color: var(--primary); }
+.kpi .nota { font-size: 12px; color: var(--on-surface-variant); }
+
+label { display: block; font-size: 12px; font-weight: 600; color: var(--on-surface-variant); margin-bottom: 6px; }
+
+input[type="text"], input[type="number"], input[type="search"], select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--outline);
+  border-radius: var(--radio);
+  background: var(--surface);
+  color: var(--on-surface);
+  font: inherit;
+}
+input:focus-visible, select:focus-visible, button:focus-visible, .zona-carga:focus-visible {
+  outline: 2px solid var(--surface-tint);
+  outline-offset: 1px;
+}
+input[type="number"] { text-align: right; font-variant-numeric: tabular-nums; }
+
+.campo-euro { position: relative; }
+.campo-euro input { padding-right: 30px; }
+.campo-euro::after {
+  content: "€"; position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); pointer-events: none;
+}
+
+.campo { margin-bottom: 0; }
+.campo-linea {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface-low);
+  border: 1px solid var(--outline);
+  border-radius: var(--radio);
+}
+.campo-linea label { margin: 0; font-size: 13px; font-weight: 500; color: var(--on-surface); }
+.campo-linea .campo-euro { width: 116px; flex: 0 0 116px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--radio);
+  border: 1px solid transparent;
+  font-weight: 600; font-size: 14px;
+  background: var(--primary); color: var(--on-primary);
+}
+.btn:hover { background: var(--primary-container); }
+.btn.secundario { background: var(--surface); color: var(--primary); border-color: var(--outline-strong); }
+.btn.secundario:hover { background: var(--surface-low); }
+.btn.fantasma { background: transparent; color: var(--on-surface-variant); border-color: transparent; }
+.btn.fantasma:hover { background: var(--surface-low); }
+.btn.peligro { background: transparent; color: var(--error); border-color: var(--outline); }
+.btn.peligro:hover { background: var(--error-container); }
+.btn.pequeno { padding: 6px 11px; font-size: 12px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.03em;
+}
+.chip.ok { background: var(--good-container); color: var(--good); }
+.chip.pendiente { background: var(--surface-container); color: var(--on-surface-variant); }
+.chip.aviso { background: var(--warning-container); color: var(--on-warning-container); }
+
+.aviso {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 14px 16px; border-radius: var(--radio);
+  background: var(--warning-container); color: var(--on-warning-container);
+  font-size: 13px; line-height: 1.55;
+}
+.aviso.error { background: var(--error-container); color: var(--error); }
+.aviso.ok { background: var(--good-container); color: var(--good); }
+.aviso .ico { flex: 0 0 20px; }
+
+/* ---------- Filtros ---------- */
+
+.panel-filtros {
+  width: var(--filtros); flex: 0 0 var(--filtros);
+  background: var(--surface);
+  border-right: 1px solid var(--outline);
+  padding: 24px 20px;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 22px;
+}
+.panel-filtros h2 {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--on-surface-variant);
+}
+
+.grupo-filtro > .titulo-filtro {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  margin-bottom: 8px;
+}
+.titulo-filtro strong { font-size: 13px; font-weight: 600; }
+.titulo-filtro .cuenta { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.acciones-filtro { display: flex; gap: 6px; margin-bottom: 8px; }
+.acciones-filtro button {
+  flex: 1; padding: 5px 8px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--outline); border-radius: var(--radio);
+  background: var(--surface); color: var(--primary);
+}
+.acciones-filtro button:hover { background: var(--secondary-container); }
+
+.lista-check {
+  max-height: 216px; overflow-y: auto;
+  border: 1px solid var(--outline); border-radius: var(--radio);
+  background: var(--surface);
+}
+.lista-check.corta { max-height: none; }
+.opcion-check {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 11px;
+  font-size: 13px; cursor: pointer;
+  border-bottom: 1px solid var(--surface-low);
+}
+.opcion-check:last-child { border-bottom: 0; }
+.opcion-check:hover { background: var(--surface-low); }
+.opcion-check input { accent-color: var(--primary); width: 15px; height: 15px; flex: 0 0 15px; margin: 0; }
+.opcion-check .texto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opcion-check .meta { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.opcion-check.desactivada { opacity: 0.4; pointer-events: none; }
+
+/* ---------- Gráficas ---------- */
+
+.gr-barras { display: flex; flex-direction: column; gap: 10px; }
+.gr-fila {
+  display: grid;
+  grid-template-columns: minmax(110px, 244px) minmax(40px, 1fr) auto;
+  gap: 12px; align-items: center;
+}
+.gr-etiqueta {
+  font-size: 12px; color: var(--on-surface-variant);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.gr-barras.compacta { gap: 16px; }
+.gr-barras.compacta .gr-fila { display: block; }
+.gr-cabeza {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; margin-bottom: 6px;
+}
+.gr-barras.compacta .gr-etiqueta {
+  font-size: 13px; font-weight: 600; color: var(--on-surface);
+  white-space: normal; overflow: visible;
+}
+.gr-barras.compacta .gr-pista { height: 8px; }
+.gr-barras.compacta .gr-valor { min-width: 0; }
+.gr-pista {
+  position: relative; height: 20px;
+  background: var(--surface-low);
+  border-radius: var(--radio);
+  overflow: hidden;
+}
+.gr-barra {
+  height: 100%;
+  background: var(--serie);
+  border-radius: 0 var(--radio) var(--radio) 0;
+  min-width: 2px;
+  transition: width 220ms ease;
+}
+.gr-valor {
+  font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+  color: var(--on-surface); white-space: nowrap; text-align: right;
+  min-width: 92px;
+}
+.gr-fila:hover .gr-barra { background: var(--primary); }
+.gr-vacia { color: var(--muted); font-size: 13px; padding: 24px 0; text-align: center; }
+
+.leyenda-nota {
+  margin-top: 16px; padding-top: 14px;
+  border-top: 1px solid var(--gridline);
+  font-size: 12px; color: var(--muted); line-height: 1.55;
+}
+
+/* ---------- Tablas ---------- */
+
+.pestanas { display: flex; gap: 4px; flex-wrap: wrap; }
+.pestanas button {
+  padding: 7px 13px; font-size: 13px; font-weight: 600;
+  border: 1px solid var(--outline); border-radius: var(--radio);
+  background: var(--surface); color: var(--on-surface-variant);
+}
+.pestanas button[aria-selected="true"] {
+  background: var(--secondary-container); color: var(--primary); border-color: var(--secondary-container);
+}
+
+/* El desglose puede tener 88 filas y una docena de columnas: se le da su propio
+   marco con scroll en los dos ejes para que nunca empuje el ancho de la página. */
+.tabla-scroll { overflow-x: auto; }
+.tabla-scroll.alta { max-height: 560px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+tbody td, thead th, tfoot td { white-space: nowrap; }
+thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--surface-low);
+  text-align: left; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--on-surface-variant);
+  padding: 10px 12px; white-space: nowrap;
+  border-bottom: 1px solid var(--outline);
+}
+tbody td { padding: 9px 12px; border-bottom: 1px solid var(--gridline); }
+tbody tr:nth-child(even) { background: #fbfbfe; }
+tbody tr:hover { background: var(--surface-low); }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+tfoot td {
+  padding: 12px; font-weight: 700;
+  border-top: 2px solid var(--outline); background: var(--surface-low);
+  font-variant-numeric: tabular-nums;
+}
+.sin-datos { padding: 40px 16px; text-align: center; color: var(--muted); }
+
+/* ---------- Carga de ficheros ---------- */
+
+.zona-carga {
+  border: 2px dashed var(--outline-strong);
+  border-radius: var(--radio-lg);
+  background: var(--surface);
+  padding: 28px 20px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.zona-carga.encima { border-color: var(--primary); background: var(--secondary-container); }
+.zona-carga .icono-zona {
+  width: 48px; height: 48px; border-radius: var(--radio-lg);
+  background: var(--secondary-container); color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+}
+.zona-carga h3 { font-size: 16px; }
+.zona-carga .pista { color: var(--muted); font-size: 13px; }
+.zona-carga input[type="file"] { display: none; }
+
+/* ---------- Utilidades ---------- */
+
+.fila { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fila.fin { justify-content: flex-end; }
+.entre { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.apilar { display: flex; flex-direction: column; gap: 16px; }
+.apilar.junto { gap: 10px; }
+.crece { flex: 1; min-width: 0; }
+.silencio { color: var(--muted); font-size: 12px; }
+.oculto { display: none !important; }
+
+.barra-guardar {
+  position: sticky; bottom: 0; z-index: 20;
+  display: flex; justify-content: flex-end; align-items: center; gap: 16px;
+  padding: 14px 32px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(6px);
+  border-top: 1px solid var(--outline);
+}
+
+.aviso-flotante {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  z-index: 60; max-width: min(520px, calc(100vw - 32px));
+  padding: 12px 18px; border-radius: var(--radio);
+  background: var(--on-surface); color: #fff;
+  box-shadow: var(--sombra-flotante);
+  font-size: 13px;
+}
+.aviso-flotante.error { background: var(--error); }
+
+/* ---------- Adaptación a pantallas estrechas ---------- */
+
+@media (max-width: 1180px) {
+  .rejilla.cuatro { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rejilla.principal-lateral, .rejilla.tres { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 900px) {
+  .app { flex-direction: column; }
+  .topbar { display: flex; }
+  .sidebar {
+    position: fixed; inset: 0 auto 0 0; z-index: 50;
+    transform: translateX(-100%); transition: transform 200ms ease;
+    box-shadow: var(--sombra-flotante);
+  }
+  .app.menu-abierto .sidebar { transform: none; }
+  .velo {
+    position: fixed; inset: 0; z-index: 40;
+    background: rgba(25, 28, 33, 0.4);
+  }
+  .panel-filtros {
+    width: 100%; flex-basis: auto; height: auto; position: static;
+    border-right: 0; border-bottom: 1px solid var(--outline);
+  }
+  .contenido { padding: 20px 16px; }
+  .rejilla.dos, .rejilla.cuatro { grid-template-columns: minmax(0, 1fr); }
+  .barra-guardar { padding: 12px 16px; }
+  h1 { font-size: 24px; }
+  .gr-fila { grid-template-columns: 1fr auto; }
+  .gr-etiqueta { grid-column: 1 / -1; }
+}
+
+/* ---------- Impresión / exportación a PDF ---------- */
+
+@media print {
+  @page { size: A4 landscape; margin: 14mm; }
+  body { background: #fff; font-size: 10.5pt; }
+  .sidebar, .panel-filtros, .topbar, .pie, .barra-guardar,
+  .no-imprimir, .velo, .aviso-flotante { display: none !important; }
+  .app, .principal { display: block; }
+  .contenido { padding: 0; max-width: none; }
+  .tarjeta {
+    box-shadow: none; border-color: #b9bdc9;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .rejilla { gap: 12px; }
+  .rejilla.cuatro { grid-template-columns: repeat(4, 1fr); }
+  .tabla-scroll, .tabla-scroll.alta { overflow: visible; max-height: none; }
+  table { font-size: 8.5pt; }
+  tbody td, thead th, tfoot td { white-space: normal; padding: 5px 6px; }
+  thead { display: table-header-group; }
+  thead th { position: static; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  .lista-check { max-height: none; }
+  .solo-impresion { display: block !important; }
+  .gr-barra { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+.solo-impresion { display: none; }
+.cabecera-impresion { margin-bottom: 18px; }
+.cabecera-impresion h1 { font-size: 20pt; color: var(--primary); }
+.cabecera-impresion .meta { color: var(--on-surface-variant); font-size: 10pt; margin-top: 4px; }
+
+/* ---------- Carga de datos ---------- */
+
+.zona-carga.grande { padding: 40px 24px; }
+.zona-carga.grande h3 { font-size: 17px; max-width: 30ch; }
+
+.columna-reconocida { display: flex; flex-direction: column; gap: 6px; }
+.columna-reconocida .fila { gap: 8px; color: var(--primary); }
+.cabecera-esperada {
+  display: inline-block; align-self: flex-start;
+  padding: 3px 8px; border-radius: var(--radio);
+  background: var(--surface-container);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; letter-spacing: 0.02em;
+  color: var(--on-surface-variant);
+}
+
+.ficha-censo {
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
+  padding: 16px;
+  border: 1px solid var(--outline);
+  border-radius: var(--radio);
+  background: var(--surface-low);
+}
+.ficha-censo .entre { width: 100%; }
+
+/* ---------- Diálogo de confirmación ---------- */
+
+.velo-modal {
+  position: fixed; inset: 0; z-index: 80;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  background: rgba(25, 28, 33, 0.45);
+  backdrop-filter: blur(4px);
+}
+.modal {
+  width: min(480px, 100%);
+  background: var(--surface);
+  border-radius: var(--radio-lg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+.cuerpo-modal { padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+.cuerpo-modal h2 { color: var(--primary); }
+.cuerpo-modal p { color: var(--on-surface-variant); line-height: 1.55; }
+.lista-modal {
+  margin: 0; padding: 12px 14px 12px 30px;
+  background: var(--surface-low);
+  border: 1px solid var(--outline);
+  border-radius: var(--radio);
+  color: var(--on-surface);
+}
+.lista-modal li { margin: 3px 0; }
+.nota-modal {
+  padding: 10px 12px; border-radius: var(--radio);
+  background: var(--warning-container);
+  color: var(--on-warning-container) !important;
+  font-size: 13px;
+}
+.pie-modal {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 16px 24px;
+  background: var(--surface-low);
+  border-top: 1px solid var(--outline);
+}
+.btn.peligro-solido { background: var(--error); color: #fff; border-color: var(--error); }
+.btn.peligro-solido:hover { background: #8f1414; }
+
+.lista-rechazos {
+  margin: 8px 0 0; padding: 8px 12px 8px 26px;
+  max-height: 200px; overflow-y: auto;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: var(--radio);
+}
+.lista-rechazos li { margin: 2px 0; font-variant-numeric: tabular-nums; }
+
+</style>
+</head>
+<body>
+<div id="app" class="app"></div>
+<script>
+/* ===== 00-geo.js ===== */
+/* Estructura territorial electoral de Canarias.
+   Provincia > Isla > Municipio. Los códigos son los del INE (35xxx Las Palmas,
+   38xxx Santa Cruz de Tenerife). Los colegios electorales no se modelan todavía;
+   la unidad de cálculo es la mesa, que cuelga directamente del municipio. */
+(function (App) {
+  'use strict';
+
+  var PROVINCIAS = [
+    { id: '35', nombre: 'Las Palmas' },
+    { id: '38', nombre: 'Santa Cruz de Tenerife' }
+  ];
+
+  var ISLAS = [
+    { id: '351', nombre: 'Fuerteventura', provincia: '35' },
+    { id: '352', nombre: 'Gran Canaria', provincia: '35' },
+    { id: '353', nombre: 'Lanzarote', provincia: '35' },
+    { id: '381', nombre: 'La Gomera', provincia: '38' },
+    { id: '382', nombre: 'El Hierro', provincia: '38' },
+    { id: '383', nombre: 'La Palma', provincia: '38' },
+    { id: '384', nombre: 'Tenerife', provincia: '38' }
+  ];
+
+  /* [codigo, nombre, isla] */
+  var M = [
+    ['35001', 'Agaete', '352'],
+    ['35002', 'Agüimes', '352'],
+    ['35003', 'Antigua', '351'],
+    ['35004', 'Arrecife', '353'],
+    ['35005', 'Artenara', '352'],
+    ['35006', 'Arucas', '352'],
+    ['35007', 'Betancuria', '351'],
+    ['35008', 'Firgas', '352'],
+    ['35009', 'Gáldar', '352'],
+    ['35010', 'Haría', '353'],
+    ['35011', 'Ingenio', '352'],
+    ['35012', 'Mogán', '352'],
+    ['35013', 'Moya', '352'],
+    ['35014', 'Oliva, La', '351'],
+    ['35015', 'Pájara', '351'],
+    ['35016', 'Palmas de Gran Canaria, Las', '352'],
+    ['35017', 'Puerto del Rosario', '351'],
+    ['35018', 'San Bartolomé', '353'],
+    ['35019', 'San Bartolomé de Tirajana', '352'],
+    ['35020', 'Aldea de San Nicolás, La', '352'],
+    ['35021', 'Santa Brígida', '352'],
+    ['35022', 'Santa Lucía de Tirajana', '352'],
+    ['35023', 'Santa María de Guía de Gran Canaria', '352'],
+    ['35024', 'Teguise', '353'],
+    ['35025', 'Tejeda', '352'],
+    ['35026', 'Telde', '352'],
+    ['35027', 'Teror', '352'],
+    ['35028', 'Tías', '353'],
+    ['35029', 'Tinajo', '353'],
+    ['35030', 'Tuineje', '351'],
+    ['35031', 'Valsequillo de Gran Canaria', '352'],
+    ['35032', 'Valleseco', '352'],
+    ['35033', 'Vega de San Mateo', '352'],
+    ['35034', 'Yaiza', '353'],
+
+    ['38001', 'Adeje', '384'],
+    ['38002', 'Agulo', '381'],
+    ['38003', 'Alajeró', '381'],
+    ['38004', 'Arafo', '384'],
+    ['38005', 'Arico', '384'],
+    ['38006', 'Arona', '384'],
+    ['38007', 'Barlovento', '383'],
+    ['38008', 'Breña Alta', '383'],
+    ['38009', 'Breña Baja', '383'],
+    ['38010', 'Buenavista del Norte', '384'],
+    ['38011', 'Candelaria', '384'],
+    ['38012', 'Fasnia', '384'],
+    ['38013', 'Frontera', '382'],
+    ['38014', 'Fuencaliente de la Palma', '383'],
+    ['38015', 'Garachico', '384'],
+    ['38016', 'Garafía', '383'],
+    ['38017', 'Granadilla de Abona', '384'],
+    ['38018', 'Guancha, La', '384'],
+    ['38019', 'Guía de Isora', '384'],
+    ['38020', 'Güímar', '384'],
+    ['38021', 'Hermigua', '381'],
+    ['38022', 'Icod de los Vinos', '384'],
+    ['38023', 'San Cristóbal de La Laguna', '384'],
+    ['38024', 'Llanos de Aridane, Los', '383'],
+    ['38025', 'Matanza de Acentejo, La', '384'],
+    ['38026', 'Orotava, La', '384'],
+    ['38027', 'Paso, El', '383'],
+    ['38028', 'Puerto de la Cruz', '384'],
+    ['38029', 'Puntagorda', '383'],
+    ['38030', 'Puntallana', '383'],
+    ['38031', 'Realejos, Los', '384'],
+    ['38032', 'Rosario, El', '384'],
+    ['38033', 'San Andrés y Sauces', '383'],
+    ['38034', 'San Juan de la Rambla', '384'],
+    ['38035', 'San Miguel de Abona', '384'],
+    ['38036', 'San Sebastián de la Gomera', '381'],
+    ['38037', 'Santa Cruz de la Palma', '383'],
+    ['38038', 'Santa Cruz de Tenerife', '384'],
+    ['38039', 'Santa Úrsula', '384'],
+    ['38040', 'Santiago del Teide', '384'],
+    ['38041', 'Sauzal, El', '384'],
+    ['38042', 'Silos, Los', '384'],
+    ['38043', 'Tacoronte', '384'],
+    ['38044', 'Tanque, El', '384'],
+    ['38045', 'Tazacorte', '383'],
+    ['38046', 'Tegueste', '384'],
+    ['38047', 'Tijarafe', '383'],
+    ['38048', 'Valverde', '382'],
+    ['38049', 'Valle Gran Rey', '381'],
+    ['38050', 'Vallehermoso', '381'],
+    ['38051', 'Victoria de Acentejo, La', '384'],
+    ['38052', 'Vilaflor de Chasna', '384'],
+    ['38053', 'Villa de Mazo', '383'],
+    ['38901', 'Pinar de El Hierro, El', '382']
+  ];
+
+  var islaPorId = {};
+  ISLAS.forEach(function (i) { islaPorId[i.id] = i; });
+
+  var MUNICIPIOS = M.map(function (row) {
+    return {
+      codigo: row[0],
+      nombre: row[1],
+      isla: row[2],
+      provincia: islaPorId[row[2]].provincia
+    };
+  });
+
+  var porCodigo = {};
+  MUNICIPIOS.forEach(function (m) { porCodigo[m.codigo] = m; });
+
+  /* Índice de búsqueda por nombre normalizado, para casar los nombres que vengan
+     en los ficheros CSV/Excel aunque lleguen sin código, en mayúsculas o con
+     el artículo delante ("La Oliva" vs "Oliva, La"). */
+  function normaliza(txt) {
+    return String(txt || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9ñ ]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  var ARTICULOS = ['la', 'el', 'los', 'las'];
+
+  function variantes(nombre) {
+    var base = normaliza(nombre);
+    var out = [base];
+    // "oliva, la" -> "la oliva"
+    var m = /^(.*) (la|el|los|las)$/.exec(base);
+    if (m) { out.push(m[2] + ' ' + m[1]); }
+    // "la oliva" -> "oliva la"
+    var partes = base.split(' ');
+    if (ARTICULOS.indexOf(partes[0]) >= 0 && partes.length > 1) {
+      out.push(partes.slice(1).join(' ') + ' ' + partes[0]);
+      out.push(partes.slice(1).join(' '));
+    }
+    return out;
+  }
+
+  var indiceNombre = {};
+  MUNICIPIOS.forEach(function (m) {
+    variantes(m.nombre).forEach(function (v) {
+      if (!(v in indiceNombre)) { indiceNombre[v] = m.codigo; }
+    });
+  });
+
+  /* Resuelve una celda de municipio que puede venir como "35001", "35001 AGAETE",
+     "AGAETE" o "Agaete (Las Palmas)". Devuelve el código o null. */
+  function resolverMunicipio(valor) {
+    if (valor == null) { return null; }
+    var txt = String(valor).trim();
+    if (!txt) { return null; }
+
+    var codigo = /(\d{5})/.exec(txt);
+    if (codigo && porCodigo[codigo[1]]) { return codigo[1]; }
+
+    var sinCodigo = txt.replace(/^\s*\d+\s*[-.]?\s*/, '');
+    var candidatos = variantes(sinCodigo);
+    for (var i = 0; i < candidatos.length; i++) {
+      if (indiceNombre[candidatos[i]]) { return indiceNombre[candidatos[i]]; }
+    }
+    return null;
+  }
+
+  /* Formas en que un fichero puede nombrar a cada provincia. Sirve para
+     contrastar la columna PROVINCIA, cuando existe, contra la que le
+     corresponde al municipio por su código. */
+  var ALIAS_PROVINCIA = {
+    '35': ['35', 'las palmas', 'palmas las', 'palmas', 'provincia de las palmas'],
+    '38': ['38', 'santa cruz de tenerife', 's c de tenerife', 'sc de tenerife',
+      'sta cruz de tenerife', 'santa cruz tenerife', 'tenerife',
+      'provincia de santa cruz de tenerife']
+  };
+
+  /* Devuelve '35', '38' o null si el texto no identifica ninguna provincia. */
+  function provinciaDeTexto(valor) {
+    var norm = normaliza(valor);
+    if (!norm) { return null; }
+    var encontrada = null;
+    Object.keys(ALIAS_PROVINCIA).forEach(function (id) {
+      if (ALIAS_PROVINCIA[id].indexOf(norm) >= 0) { encontrada = id; }
+    });
+    return encontrada;
+  }
+
+  /* Cuando una celda trae código y nombre juntos ("35001 AGAETE"), comprueba que
+     se refieran al mismo municipio. Un desajuste significa que el fichero sigue
+     otra codificación, y hay que avisar: importar por código sin más ruido
+     colgaría los datos del municipio equivocado en silencio. */
+  function discrepancia(valor, codigo) {
+    var txt = String(valor == null ? '' : valor).trim();
+    var resto = txt.replace(/\d{5}/, '').replace(/^[\s\-.:;,]+/, '').trim();
+    if (!resto || !porCodigo[codigo]) { return null; }
+
+    var esperadas = variantes(porCodigo[codigo].nombre);
+    var recibida = normaliza(resto);
+    if (!recibida) { return null; }
+    if (esperadas.indexOf(recibida) >= 0) { return null; }
+
+    return {
+      texto: txt,
+      codigo: codigo,
+      nombreEsperado: porCodigo[codigo].nombre
+    };
+  }
+
+  App.geo = {
+    PROVINCIAS: PROVINCIAS,
+    ISLAS: ISLAS,
+    MUNICIPIOS: MUNICIPIOS,
+    municipio: function (codigo) { return porCodigo[codigo] || null; },
+    isla: function (id) { return islaPorId[id] || null; },
+    provincia: function (id) {
+      for (var i = 0; i < PROVINCIAS.length; i++) {
+        if (PROVINCIAS[i].id === id) { return PROVINCIAS[i]; }
+      }
+      return null;
+    },
+    islasDe: function (provinciaId) {
+      return ISLAS.filter(function (i) { return i.provincia === provinciaId; });
+    },
+    municipiosDe: function (islaId) {
+      return MUNICIPIOS.filter(function (m) { return m.isla === islaId; });
+    },
+    normaliza: normaliza,
+    resolverMunicipio: resolverMunicipio,
+    discrepancia: discrepancia,
+    provinciaDeTexto: provinciaDeTexto
+  };
+})(window.App = window.App || {});
+
+/* ===== 10-state.js ===== */
+/* Estado de la aplicación y su persistencia.
+   En esta fase el almacén es localStorage (por dispositivo). El acceso pasa
+   siempre por App.store, de modo que sustituirlo por una API REST contra el
+   backend en Cloud Run afecta sólo a este fichero. */
+(function (App) {
+  'use strict';
+
+  var CLAVE = 'gastos-electorales:v1';
+
+  /* Tipologías de colaborador. El orden manda en la UI y en los informes.
+     `agregable: false` marca los conceptos que, por decisión de negocio, no se
+     suman al reparto territorial (los coordinadores todavía no cuelgan de un
+     municipio). */
+  var COLABORADORES = [
+    { id: 'representantes', nombre: 'Representantes de la Administración', base: 'representantes', agregable: true },
+    { id: 'secretarios', nombre: 'Secretarios de Ayuntamiento', base: 'tramo-mesas', agregable: true },
+    { id: 'juecesPaz', nombre: 'Jueces de Paz', base: 'municipio', agregable: true },
+    { id: 'acondicionamiento', nombre: 'Acondicionamiento de locales', base: 'mesas', agregable: true },
+    { id: 'personalColaborador', nombre: 'Personal colaborador', base: 'mesas', agregable: true },
+    { id: 'montajeTransporte', nombre: 'Montaje y transporte', base: 'mesas', agregable: true },
+    { id: 'policia', nombre: 'Policía Autonómica y Local', base: 'efectivos', agregable: true },
+    { id: 'miembrosMesa', nombre: 'Miembros de mesas electorales', base: 'mesas-x3', agregable: true },
+    { id: 'coordinadores', nombre: 'Coordinadores de tablets', base: 'global', agregable: false }
+  ];
+
+  var TIPOLOGIAS_PD = ['PD0', 'PD1', 'PD2', 'PD3', 'PD4', 'PD5'];
+
+  function configPorDefecto() {
+    return {
+      representantes: { PD0: 130, PD1: 170, PD2: 190, PD3: 210, PD4: 230, PD5: 250 },
+      secretarios: { hasta10: 100, de11a50: 180, mas50: 250 },
+      juecesPaz: 45,
+      acondicionamiento: 60,
+      personalColaborador: 85,
+      montajeTransporte: 110,
+      policia: 90,
+      miembrosMesa: 70,
+      /* Miembros por mesa. El briefing fija 3; se deja configurable porque es
+         el tipo de constante que cambia entre convocatorias. */
+      miembrosPorMesa: 3,
+      coordinadores: {
+        tarifaHasta10: 120,
+        tarifaDesde11: 140,
+        numHasta10: 0,
+        numDesde11: 0
+      }
+    };
+  }
+
+  function estadoPorDefecto() {
+    return {
+      version: 1,
+      convocatoria: 'Proceso electoral',
+      config: configPorDefecto(),
+      /* Datos cargados por municipio, indexados por código INE. */
+      mesas: {},            // codigo -> nº de mesas
+      representantes: {},   // codigo -> { PD0: n, ... }
+      policia: {},          // codigo -> nº de efectivos
+      cargas: {}            // origen -> { fecha, fichero, filas }
+    };
+  }
+
+  /* Mezcla superficial y recursiva de los valores guardados sobre los valores por
+     defecto, para que una versión nueva que añada un campo no rompa un estado
+     antiguo. */
+  function fusiona(base, guardado) {
+    if (!guardado || typeof guardado !== 'object') { return base; }
+    Object.keys(guardado).forEach(function (k) {
+      var v = guardado[k];
+      if (v && typeof v === 'object' && !Array.isArray(v) &&
+          base[k] && typeof base[k] === 'object' && !Array.isArray(base[k])) {
+        fusiona(base[k], v);
+      } else if (v !== undefined) {
+        base[k] = v;
+      }
+    });
+    return base;
+  }
+
+  var estado = estadoPorDefecto();
+  var suscriptores = [];
+
+  function cargar() {
+    var bruto = null;
+    try { bruto = window.localStorage.getItem(CLAVE); } catch (e) { bruto = null; }
+    if (!bruto) { return; }
+    try {
+      estado = fusiona(estadoPorDefecto(), JSON.parse(bruto));
+    } catch (e) {
+      console.warn('Estado guardado ilegible, se parte de los valores por defecto', e);
+    }
+  }
+
+  function guardar() {
+    try {
+      window.localStorage.setItem(CLAVE, JSON.stringify(estado));
+    } catch (e) {
+      console.warn('No se pudo guardar el estado', e);
+      return false;
+    }
+    return true;
+  }
+
+  function notificar() {
+    suscriptores.forEach(function (fn) { fn(estado); });
+  }
+
+  App.store = {
+    COLABORADORES: COLABORADORES,
+    TIPOLOGIAS_PD: TIPOLOGIAS_PD,
+    colaborador: function (id) {
+      for (var i = 0; i < COLABORADORES.length; i++) {
+        if (COLABORADORES[i].id === id) { return COLABORADORES[i]; }
+      }
+      return null;
+    },
+    init: cargar,
+    estado: function () { return estado; },
+    /* muta(fn) aplica el cambio, persiste y avisa a las vistas. */
+    muta: function (fn) {
+      fn(estado);
+      guardar();
+      notificar();
+    },
+    reiniciar: function () {
+      estado = estadoPorDefecto();
+      guardar();
+      notificar();
+    },
+    exportar: function () { return JSON.parse(JSON.stringify(estado)); },
+    importar: function (obj) {
+      estado = fusiona(estadoPorDefecto(), obj);
+      guardar();
+      notificar();
+    },
+    suscribir: function (fn) { suscriptores.push(fn); }
+  };
+})(window.App = window.App || {});
+
+/* ===== 20-parsers.js ===== */
+/* Lectura de los ficheros de datos que aporta el usuario.
+   Soporta CSV/TSV y XLSX. El XLSX se abre con las APIs del propio navegador
+   (DecompressionStream + DOMParser): un .xlsx es un ZIP con XML dentro, así que
+   no hace falta ninguna librería externa. */
+(function (App) {
+  'use strict';
+
+  /* ---------- CSV ---------- */
+
+  function detectarDelimitador(linea) {
+    var candidatos = [';', ',', '\t', '|'];
+    var mejor = ';';
+    var max = -1;
+    candidatos.forEach(function (d) {
+      var n = 0;
+      var dentro = false;
+      for (var i = 0; i < linea.length; i++) {
+        var ch = linea[i];
+        if (ch === '"') { dentro = !dentro; }
+        else if (ch === d && !dentro) { n++; }
+      }
+      if (n > max) { max = n; mejor = d; }
+    });
+    return max > 0 ? mejor : ';';
+  }
+
+  function parseCSV(texto) {
+    texto = texto.replace(/^﻿/, '');
+    var primeraLinea = texto.split(/\r?\n/)[0] || '';
+    var delim = detectarDelimitador(primeraLinea);
+
+    var filas = [];
+    var fila = [];
+    var campo = '';
+    var entreComillas = false;
+
+    for (var i = 0; i < texto.length; i++) {
+      var ch = texto[i];
+      if (entreComillas) {
+        if (ch === '"') {
+          if (texto[i + 1] === '"') { campo += '"'; i++; }
+          else { entreComillas = false; }
+        } else { campo += ch; }
+        continue;
+      }
+      if (ch === '"') { entreComillas = true; }
+      else if (ch === delim) { fila.push(campo); campo = ''; }
+      else if (ch === '\n') { fila.push(campo); filas.push(fila); fila = []; campo = ''; }
+      else if (ch === '\r') { /* se ignora, el \n cierra la fila */ }
+      else { campo += ch; }
+    }
+    if (campo !== '' || fila.length) { fila.push(campo); filas.push(fila); }
+
+    return filas.filter(function (f) {
+      return f.some(function (c) { return String(c).trim() !== ''; });
+    });
+  }
+
+  /* ---------- XLSX ---------- */
+
+  function leerU16(dv, off) { return dv.getUint16(off, true); }
+  function leerU32(dv, off) { return dv.getUint32(off, true); }
+
+  /* Recorre el directorio central del ZIP y devuelve { nombre: {offset, metodo, tamComprimido} } */
+  function indexarZip(buffer) {
+    var dv = new DataView(buffer);
+    var bytes = new Uint8Array(buffer);
+
+    var eocd = -1;
+    for (var i = bytes.length - 22; i >= 0 && i > bytes.length - 22 - 65536; i--) {
+      if (leerU32(dv, i) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) { throw new Error('El fichero no es un XLSX válido (no se encontró el índice del ZIP).'); }
+
+    var nEntradas = leerU16(dv, eocd + 10);
+    var offCentral = leerU32(dv, eocd + 16);
+
+    var entradas = {};
+    var p = offCentral;
+    for (var n = 0; n < nEntradas; n++) {
+      if (leerU32(dv, p) !== 0x02014b50) { break; }
+      var metodo = leerU16(dv, p + 10);
+      var tamComprimido = leerU32(dv, p + 20);
+      var lenNombre = leerU16(dv, p + 28);
+      var lenExtra = leerU16(dv, p + 30);
+      var lenComentario = leerU16(dv, p + 32);
+      var offLocal = leerU32(dv, p + 42);
+      var nombre = new TextDecoder('utf-8').decode(bytes.subarray(p + 46, p + 46 + lenNombre));
+      entradas[nombre] = { offLocal: offLocal, metodo: metodo, tamComprimido: tamComprimido };
+      p += 46 + lenNombre + lenExtra + lenComentario;
+    }
+    return { dv: dv, bytes: bytes, entradas: entradas };
+  }
+
+  function extraer(zip, nombre) {
+    var e = zip.entradas[nombre];
+    if (!e) { return Promise.resolve(null); }
+
+    var lenNombre = leerU16(zip.dv, e.offLocal + 26);
+    var lenExtra = leerU16(zip.dv, e.offLocal + 28);
+    var inicio = e.offLocal + 30 + lenNombre + lenExtra;
+    var datos = zip.bytes.subarray(inicio, inicio + e.tamComprimido);
+
+    if (e.metodo === 0) {
+      return Promise.resolve(new TextDecoder('utf-8').decode(datos));
+    }
+    if (e.metodo !== 8) {
+      return Promise.reject(new Error('Compresión ZIP no soportada en ' + nombre));
+    }
+    if (typeof DecompressionStream === 'undefined') {
+      return Promise.reject(new Error('Este navegador no puede descomprimir XLSX. Guarde el fichero como CSV.'));
+    }
+    var ds = new DecompressionStream('deflate-raw');
+    var stream = new Blob([datos]).stream().pipeThrough(ds);
+    return new Response(stream).text();
+  }
+
+  function letrasAIndice(ref) {
+    var letras = /^([A-Z]+)/.exec(ref || '');
+    if (!letras) { return 0; }
+    var n = 0;
+    var s = letras[1];
+    for (var i = 0; i < s.length; i++) {
+      n = n * 26 + (s.charCodeAt(i) - 64);
+    }
+    return n - 1;
+  }
+
+  function textoDeNodo(nodo) {
+    /* Un <si> puede venir partido en varios <t> por formato enriquecido. */
+    var ts = nodo.getElementsByTagName('t');
+    var out = '';
+    for (var i = 0; i < ts.length; i++) { out += ts[i].textContent; }
+    return out;
+  }
+
+  function parseXLSX(buffer) {
+    var zip = indexarZip(buffer);
+
+    /* Localiza la primera hoja siguiendo workbook.xml -> rels; si algo falta,
+       cae en el nombre convencional sheet1.xml. */
+    return extraer(zip, 'xl/workbook.xml').then(function (wbXml) {
+      var rutaHoja = 'xl/worksheets/sheet1.xml';
+      if (wbXml) {
+        try {
+          var wb = new DOMParser().parseFromString(wbXml, 'application/xml');
+          var hojas = wb.getElementsByTagName('sheet');
+          if (hojas.length) {
+            var rid = hojas[0].getAttribute('r:id') || hojas[0].getAttributeNS(
+              'http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+            if (rid) {
+              return extraer(zip, 'xl/_rels/workbook.xml.rels').then(function (relsXml) {
+                if (relsXml) {
+                  var rels = new DOMParser().parseFromString(relsXml, 'application/xml');
+                  var lista = rels.getElementsByTagName('Relationship');
+                  for (var i = 0; i < lista.length; i++) {
+                    if (lista[i].getAttribute('Id') === rid) {
+                      var destino = lista[i].getAttribute('Target').replace(/^\/?xl\//, '').replace(/^\//, '');
+                      return 'xl/' + destino;
+                    }
+                  }
+                }
+                return rutaHoja;
+              });
+            }
+          }
+        } catch (e) { /* se usa la ruta convencional */ }
+      }
+      return rutaHoja;
+    }).then(function (rutaHoja) {
+      return Promise.all([
+        extraer(zip, 'xl/sharedStrings.xml'),
+        extraer(zip, rutaHoja)
+      ]);
+    }).then(function (res) {
+      var ssXml = res[0];
+      var hojaXml = res[1];
+      if (!hojaXml) { throw new Error('No se encontró ninguna hoja de cálculo en el fichero.'); }
+
+      var compartidas = [];
+      if (ssXml) {
+        var ssDoc = new DOMParser().parseFromString(ssXml, 'application/xml');
+        var sis = ssDoc.getElementsByTagName('si');
+        for (var i = 0; i < sis.length; i++) { compartidas.push(textoDeNodo(sis[i])); }
+      }
+
+      var doc = new DOMParser().parseFromString(hojaXml, 'application/xml');
+      var filasXml = doc.getElementsByTagName('row');
+      var filas = [];
+
+      for (var r = 0; r < filasXml.length; r++) {
+        var celdas = filasXml[r].getElementsByTagName('c');
+        var fila = [];
+        for (var c = 0; c < celdas.length; c++) {
+          var celda = celdas[c];
+          var idx = letrasAIndice(celda.getAttribute('r'));
+          var tipo = celda.getAttribute('t');
+          var valor = '';
+
+          if (tipo === 's') {
+            var vNodo = celda.getElementsByTagName('v')[0];
+            var pos = vNodo ? parseInt(vNodo.textContent, 10) : -1;
+            valor = compartidas[pos] !== undefined ? compartidas[pos] : '';
+          } else if (tipo === 'inlineStr') {
+            valor = textoDeNodo(celda);
+          } else {
+            var v = celda.getElementsByTagName('v')[0];
+            valor = v ? v.textContent : '';
+          }
+
+          while (fila.length < idx) { fila.push(''); }
+          fila[idx] = valor;
+        }
+        if (fila.some(function (x) { return String(x).trim() !== ''; })) { filas.push(fila); }
+      }
+      return filas;
+    });
+  }
+
+  /* ---------- Punto de entrada común ---------- */
+
+  function leerFichero(file) {
+    var esExcel = /\.xlsx$/i.test(file.name);
+    if (/\.xls$/i.test(file.name)) {
+      return Promise.reject(new Error(
+        'El formato .xls antiguo no está soportado. Guarde el fichero como .xlsx o CSV.'));
+    }
+    if (esExcel) {
+      return file.arrayBuffer().then(parseXLSX);
+    }
+    return file.text().then(parseCSV);
+  }
+
+  /* ---------- Interpretación de las tablas ---------- */
+
+  function aNumero(valor) {
+    if (valor == null || valor === '') { return 0; }
+    var t = String(valor).trim().replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+    var n = parseFloat(t);
+    return isNaN(n) ? 0 : n;
+  }
+
+  /* Un fichero de datos puede traer varios censos a la vez. Cada bloque se
+     reconoce por su cabecera, de modo que un único Excel con
+     MUNICIPIOS | PD0..PD5 | MESAS alimenta representantes y mesas en una sola
+     carga, y un fichero de dos columnas sigue funcionando igual. */
+  var BLOQUES = [
+    {
+      id: 'representantes',
+      nombre: 'Representantes de la Administración',
+      columnas: App.store.TIPOLOGIAS_PD.map(function (t) {
+        return { clave: t, etiqueta: t, patron: new RegExp('^' + t.toLowerCase().replace('pd', 'pd\\s*') + '$') };
+      }),
+      /* Varias columnas: el valor de cada municipio es un objeto PD0..PD5. */
+      leer: function (fila, cols) {
+        var reg = {};
+        App.store.TIPOLOGIAS_PD.forEach(function (t) {
+          reg[t] = aNumero(fila[cols[t]]);
+        });
+        return reg;
+      },
+      sumar: function (acc, v) {
+        App.store.TIPOLOGIAS_PD.forEach(function (t) { acc[t] = (acc[t] || 0) + v[t]; });
+        return acc;
+      },
+      vacio: function () { return {}; }
+    },
+    {
+      id: 'mesas',
+      nombre: 'Mesas electorales',
+      columnas: [{ clave: 'mesas', etiqueta: 'MESAS', patron: /^(mesas|n mesas|no mesas|num mesas|numero de mesas|total mesas|mesas electorales)$/ }],
+      leer: function (fila, cols) { return aNumero(fila[cols.mesas]); },
+      sumar: function (acc, v) { return acc + v; },
+      vacio: function () { return 0; }
+    },
+    {
+      id: 'policia',
+      nombre: 'Efectivos de policía',
+      columnas: [{ clave: 'policia', etiqueta: 'EFECTIVOS', patron: /^(efectivos|policia|agentes|dotacion|efectivos policia|efectivos de policia)$/ }],
+      leer: function (fila, cols) { return aNumero(fila[cols.policia]); },
+      sumar: function (acc, v) { return acc + v; },
+      vacio: function () { return 0; }
+    }
+  ];
+
+  var PATRON_MUNICIPIO = /^(municipios?|codigo|cod|nombre|termino municipal|ayuntamientos?)$/;
+  var PATRON_PROVINCIA = /^(provincias?|prov|cpro)$/;
+  var PATRON_TOTALES = /^(total|totales|suma|sumas|total general)/;
+
+  /* Localiza la fila de cabecera y el índice de cada columna conocida. Se miran
+     las 20 primeras filas porque estos ficheros suelen llevar título encima. */
+  function localizarCabecera(filas) {
+    for (var f = 0; f < Math.min(filas.length, 20); f++) {
+      var cols = {};
+      var municipio = -1;
+      var provincia = -1;
+
+      filas[f].forEach(function (celda, c) {
+        var txt = App.geo.normaliza(celda);
+        if (!txt) { return; }
+        if (provincia < 0 && PATRON_PROVINCIA.test(txt)) { provincia = c; return; }
+        if (municipio < 0 && PATRON_MUNICIPIO.test(txt)) { municipio = c; return; }
+        BLOQUES.forEach(function (b) {
+          b.columnas.forEach(function (col) {
+            if (cols[col.clave] === undefined && col.patron.test(txt)) { cols[col.clave] = c; }
+          });
+        });
+      });
+
+      if (municipio >= 0) {
+        return { indice: f, municipio: municipio, provincia: provincia, columnas: cols };
+      }
+    }
+    return null;
+  }
+
+  /* Un bloque está presente cuando aparecen todas sus columnas. Media tabla de
+     representantes (sólo PD0 y PD3, por ejemplo) es más probable que sea un
+     error del fichero que una carga parcial deliberada, así que no se importa. */
+  function bloquesPresentes(columnas) {
+    return BLOQUES.filter(function (b) {
+      return b.columnas.every(function (col) { return columnas[col.clave] !== undefined; });
+    });
+  }
+
+  function interpretarFicheroDatos(filas) {
+    var cab = localizarCabecera(filas);
+    if (!cab) {
+      throw new Error('No se encontró la columna de municipios. La cabecera debe incluir ' +
+        'MUNICIPIOS (o CÓDIGO / NOMBRE) y al menos una de: PD0…PD5, MESAS o EFECTIVOS.');
+    }
+
+    var presentes = bloquesPresentes(cab.columnas);
+    if (!presentes.length) {
+      throw new Error('Se reconoció la columna de municipios pero ningún dato. ' +
+        'Se esperaba PD0…PD5 (representantes), MESAS o EFECTIVOS.');
+    }
+
+    var resultado = {};
+    var sumas = {};
+    presentes.forEach(function (b) {
+      resultado[b.id] = {};
+      sumas[b.id] = b.vacio();
+    });
+
+    var noReconocidos = [];
+    var discrepancias = [];
+    var provinciasDiscordantes = [];
+    var filaTotales = null;
+
+    for (var f = cab.indice + 1; f < filas.length; f++) {
+      var fila = filas[f];
+      var bruto = fila[cab.municipio];
+      var texto = String(bruto == null ? '' : bruto).trim();
+      if (!texto) { continue; }
+
+      var codigo = App.geo.resolverMunicipio(texto);
+
+      /* La fila de totales del fichero no es un municipio: se guarda aparte y
+         luego sirve para comprobar que lo importado cuadra con lo declarado. */
+      if (!codigo && PATRON_TOTALES.test(App.geo.normaliza(texto))) {
+        filaTotales = fila;
+        continue;
+      }
+      if (!codigo) { noReconocidos.push(texto); continue; }
+
+      var choque = App.geo.discrepancia(texto, codigo);
+      if (choque) { discrepancias.push(choque); }
+
+      /* La columna PROVINCIA no se importa —la provincia se deduce del código—
+         pero si el fichero la trae y no concuerda, conviene decirlo. */
+      if (cab.provincia >= 0) {
+        var declarada = App.geo.provinciaDeTexto(fila[cab.provincia]);
+        var real = App.geo.municipio(codigo).provincia;
+        if (declarada && declarada !== real) {
+          provinciasDiscordantes.push({
+            texto: texto,
+            declarada: App.geo.provincia(declarada).nombre,
+            real: App.geo.provincia(real).nombre
+          });
+        }
+      }
+
+      presentes.forEach(function (b) {
+        var valor = b.leer(fila, cab.columnas);
+        resultado[b.id][codigo] = valor;
+        sumas[b.id] = b.sumar(sumas[b.id], valor);
+      });
+    }
+
+    /* Comprobación contra la fila de totales, cuando el fichero la trae. */
+    var comprobacion = null;
+    if (filaTotales) {
+      comprobacion = { cuadra: true, lineas: [] };
+      presentes.forEach(function (b) {
+        b.columnas.forEach(function (col) {
+          var declarado = aNumero(filaTotales[cab.columnas[col.clave]]);
+          var calculado = b.id === 'representantes'
+            ? (sumas[b.id][col.clave] || 0)
+            : sumas[b.id];
+          var cuadra = Math.abs(declarado - calculado) < 0.005;
+          if (!cuadra) { comprobacion.cuadra = false; }
+          comprobacion.lineas.push({
+            columna: col.etiqueta,
+            declarado: declarado,
+            calculado: calculado,
+            cuadra: cuadra
+          });
+        });
+      });
+    }
+
+    /* En los ficheros reales hay un representante por mesa, así que ΣPD0..PD5
+       debería igualar a MESAS. No se impone como regla —puede no cumplirse en
+       otra convocatoria— pero cuando ambos censos vienen en el mismo fichero se
+       contrastan, porque una diferencia suele delatar una fila mal cuadrada. */
+    var repVsMesas = null;
+    if (resultado.representantes && resultado.mesas) {
+      repVsMesas = { coinciden: 0, desajustes: [] };
+      Object.keys(resultado.representantes).forEach(function (codigo) {
+        if (resultado.mesas[codigo] === undefined) { return; }
+        var suma = App.store.TIPOLOGIAS_PD.reduce(function (a, t) {
+          return a + (resultado.representantes[codigo][t] || 0);
+        }, 0);
+        var mesas = resultado.mesas[codigo];
+        if (suma === mesas) {
+          repVsMesas.coinciden += 1;
+        } else {
+          var geo = App.geo.municipio(codigo);
+          repVsMesas.desajustes.push({
+            codigo: codigo,
+            nombre: geo ? geo.nombre : codigo,
+            representantes: suma,
+            mesas: mesas
+          });
+        }
+      });
+    }
+
+    return {
+      bloques: presentes.map(function (b) {
+        return {
+          id: b.id,
+          nombre: b.nombre,
+          datos: resultado[b.id],
+          municipios: Object.keys(resultado[b.id]).length
+        };
+      }),
+      noReconocidos: noReconocidos,
+      discrepancias: discrepancias,
+      provinciasDiscordantes: provinciasDiscordantes,
+      comprobacion: comprobacion,
+      repVsMesas: repVsMesas
+    };
+  }
+
+  App.parsers = {
+    parseCSV: parseCSV,
+    parseXLSX: parseXLSX,
+    leerFichero: leerFichero,
+    aNumero: aNumero,
+    BLOQUES: BLOQUES,
+    interpretarFicheroDatos: interpretarFicheroDatos
+  };
+})(window.App = window.App || {});
+
+/* ===== 30-calc.js ===== */
+/* Motor de cálculo de gastos.
+   Todo el dinero se calcula aquí y en ningún otro sitio: las vistas sólo pintan
+   lo que devuelven estas funciones. */
+(function (App) {
+  'use strict';
+
+  var PD = App.store.TIPOLOGIAS_PD;
+
+  /* Un municipio se considera activo cuando tiene mesas cargadas. Los conceptos
+     que se cobran "por municipio" (secretario, juez de paz) sólo devengan en los
+     municipios activos: sin mesas no hay proceso electoral que atender. */
+  function estaActivo(estado, codigo) {
+    return (Number(estado.mesas[codigo]) || 0) > 0;
+  }
+
+  function tramoSecretario(cfg, mesas) {
+    if (mesas <= 0) { return 0; }
+    if (mesas <= 10) { return Number(cfg.secretarios.hasta10) || 0; }
+    if (mesas <= 50) { return Number(cfg.secretarios.de11a50) || 0; }
+    return Number(cfg.secretarios.mas50) || 0;
+  }
+
+  /* Desglose de un municipio: importe y "cantidad" (la magnitud sobre la que se
+     calcula) por cada tipología agregable. */
+  function calcularMunicipio(estado, codigo) {
+    var cfg = estado.config;
+    var mesas = Number(estado.mesas[codigo]) || 0;
+    var efectivos = Number(estado.policia[codigo]) || 0;
+    var reps = estado.representantes[codigo] || {};
+    var activo = mesas > 0;
+
+    var nRepresentantes = 0;
+    var importeRepresentantes = 0;
+    PD.forEach(function (t) {
+      var n = Number(reps[t]) || 0;
+      nRepresentantes += n;
+      importeRepresentantes += n * (Number(cfg.representantes[t]) || 0);
+    });
+
+    var lineas = {
+      representantes: {
+        cantidad: nRepresentantes,
+        unidad: 'representantes',
+        importeUnitario: nRepresentantes ? importeRepresentantes / nRepresentantes : 0,
+        importe: importeRepresentantes
+      },
+      secretarios: {
+        cantidad: activo ? 1 : 0,
+        unidad: 'secretarios',
+        importeUnitario: tramoSecretario(cfg, mesas),
+        importe: activo ? tramoSecretario(cfg, mesas) : 0
+      },
+      juecesPaz: {
+        cantidad: activo ? 1 : 0,
+        unidad: 'jueces',
+        importeUnitario: Number(cfg.juecesPaz) || 0,
+        importe: activo ? (Number(cfg.juecesPaz) || 0) : 0
+      },
+      acondicionamiento: {
+        cantidad: mesas,
+        unidad: 'mesas',
+        importeUnitario: Number(cfg.acondicionamiento) || 0,
+        importe: mesas * (Number(cfg.acondicionamiento) || 0)
+      },
+      personalColaborador: {
+        cantidad: mesas,
+        unidad: 'mesas',
+        importeUnitario: Number(cfg.personalColaborador) || 0,
+        importe: mesas * (Number(cfg.personalColaborador) || 0)
+      },
+      montajeTransporte: {
+        cantidad: mesas,
+        unidad: 'mesas',
+        importeUnitario: Number(cfg.montajeTransporte) || 0,
+        importe: mesas * (Number(cfg.montajeTransporte) || 0)
+      },
+      policia: {
+        cantidad: efectivos,
+        unidad: 'efectivos',
+        importeUnitario: Number(cfg.policia) || 0,
+        importe: efectivos * (Number(cfg.policia) || 0)
+      },
+      miembrosMesa: {
+        cantidad: mesas * (Number(cfg.miembrosPorMesa) || 0),
+        unidad: 'miembros',
+        importeUnitario: Number(cfg.miembrosMesa) || 0,
+        importe: mesas * (Number(cfg.miembrosPorMesa) || 0) * (Number(cfg.miembrosMesa) || 0)
+      }
+    };
+
+    return {
+      codigo: codigo,
+      mesas: mesas,
+      efectivos: efectivos,
+      activo: activo,
+      representantesPorTipo: reps,
+      lineas: lineas
+    };
+  }
+
+  /* Los coordinadores de tablets viven fuera del reparto territorial: se
+     configuran como totales y se informan aparte. */
+  function calcularCoordinadores(estado) {
+    var c = estado.config.coordinadores || {};
+    var nA = Number(c.numHasta10) || 0;
+    var nB = Number(c.numDesde11) || 0;
+    var tA = Number(c.tarifaHasta10) || 0;
+    var tB = Number(c.tarifaDesde11) || 0;
+    return {
+      hasta10: { cantidad: nA, importeUnitario: tA, importe: nA * tA },
+      desde11: { cantidad: nB, importeUnitario: tB, importe: nB * tB },
+      total: nA * tA + nB * tB
+    };
+  }
+
+  /* Aplica los filtros del informe y devuelve los códigos de municipio en ámbito.
+     filtros = { provincias: [], islas: [], municipios: [], soloActivos: bool } */
+  function municipiosEnAmbito(estado, filtros) {
+    return App.geo.MUNICIPIOS.filter(function (m) {
+      if (filtros.provincias && filtros.provincias.length &&
+          filtros.provincias.indexOf(m.provincia) < 0) { return false; }
+      if (filtros.islas && filtros.islas.length &&
+          filtros.islas.indexOf(m.isla) < 0) { return false; }
+      if (filtros.municipios && filtros.municipios.length &&
+          filtros.municipios.indexOf(m.codigo) < 0) { return false; }
+      if (filtros.soloActivos && !estaActivo(estado, m.codigo)) { return false; }
+      return true;
+    }).map(function (m) { return m.codigo; });
+  }
+
+  /* Construye el informe completo para un ámbito y una selección de tipologías. */
+  function generarInforme(estado, filtros, tiposSeleccionados) {
+    var codigos = municipiosEnAmbito(estado, filtros);
+    var tipos = tiposSeleccionados || [];
+
+    var porMunicipio = [];
+    var totalPorTipo = {};
+    var cantidadPorTipo = {};
+    App.store.COLABORADORES.forEach(function (c) {
+      totalPorTipo[c.id] = 0;
+      cantidadPorTipo[c.id] = 0;
+    });
+
+    var totalGeneral = 0;
+    var totalMesas = 0;
+    var municipiosActivos = 0;
+
+    codigos.forEach(function (codigo) {
+      var det = calcularMunicipio(estado, codigo);
+      var geo = App.geo.municipio(codigo);
+      var subtotal = 0;
+      var lineasFiltradas = {};
+
+      Object.keys(det.lineas).forEach(function (tipo) {
+        if (tipos.indexOf(tipo) < 0) { return; }
+        var l = det.lineas[tipo];
+        lineasFiltradas[tipo] = l;
+        subtotal += l.importe;
+        totalPorTipo[tipo] += l.importe;
+        cantidadPorTipo[tipo] += l.cantidad;
+      });
+
+      totalMesas += det.mesas;
+      if (det.activo) { municipiosActivos += 1; }
+      totalGeneral += subtotal;
+
+      porMunicipio.push({
+        codigo: codigo,
+        nombre: geo.nombre,
+        isla: geo.isla,
+        islaNombre: App.geo.isla(geo.isla).nombre,
+        provincia: geo.provincia,
+        provinciaNombre: App.geo.provincia(geo.provincia).nombre,
+        mesas: det.mesas,
+        efectivos: det.efectivos,
+        activo: det.activo,
+        lineas: lineasFiltradas,
+        subtotal: subtotal
+      });
+    });
+
+    /* Agregados territoriales, calculados sobre los municipios ya filtrados. */
+    function agrupar(clave, nombreClave) {
+      var mapa = {};
+      porMunicipio.forEach(function (m) {
+        var k = m[clave];
+        if (!mapa[k]) {
+          mapa[k] = { id: k, nombre: m[nombreClave], importe: 0, mesas: 0, municipios: 0 };
+        }
+        mapa[k].importe += m.subtotal;
+        mapa[k].mesas += m.mesas;
+        mapa[k].municipios += 1;
+      });
+      return Object.keys(mapa).map(function (k) { return mapa[k]; })
+        .sort(function (a, b) { return b.importe - a.importe; });
+    }
+
+    var coordinadores = calcularCoordinadores(estado);
+    var incluyeCoordinadores = tipos.indexOf('coordinadores') >= 0;
+
+    return {
+      generadoEn: new Date(),
+      filtros: filtros,
+      tipos: tipos,
+      porMunicipio: porMunicipio,
+      porIsla: agrupar('isla', 'islaNombre'),
+      porProvincia: agrupar('provincia', 'provinciaNombre'),
+      totalPorTipo: totalPorTipo,
+      cantidadPorTipo: cantidadPorTipo,
+      totalMesas: totalMesas,
+      municipiosEnAmbito: codigos.length,
+      municipiosActivos: municipiosActivos,
+      /* Total territorial: la suma de todo lo que se reparte por municipio. */
+      totalTerritorial: totalGeneral,
+      coordinadores: coordinadores,
+      incluyeCoordinadores: incluyeCoordinadores,
+      /* Total general: territorial + coordinadores, que van aparte por diseño. */
+      total: totalGeneral + (incluyeCoordinadores ? coordinadores.total : 0)
+    };
+  }
+
+  App.calc = {
+    calcularMunicipio: calcularMunicipio,
+    calcularCoordinadores: calcularCoordinadores,
+    municipiosEnAmbito: municipiosEnAmbito,
+    tramoSecretario: tramoSecretario,
+    generarInforme: generarInforme
+  };
+})(window.App = window.App || {});
+
+/* ===== 40-ui.js ===== */
+/* Utilidades compartidas de interfaz: formato, construcción de nodos, gráficas
+   de barras y avisos. Las gráficas se construyen con HTML en lugar de SVG para
+   que se adapten solas al ancho disponible, que en este proyecto va desde el
+   iPad hasta un monitor de escritorio. */
+(function (App) {
+  'use strict';
+
+  var fmtEuro = new Intl.NumberFormat('es-ES', {
+    style: 'currency', currency: 'EUR',
+    minimumFractionDigits: 2, maximumFractionDigits: 2
+  });
+  var fmtEuroCorto = new Intl.NumberFormat('es-ES', {
+    style: 'currency', currency: 'EUR',
+    minimumFractionDigits: 0, maximumFractionDigits: 0
+  });
+  var fmtNum = new Intl.NumberFormat('es-ES');
+  var fmtFecha = new Intl.DateTimeFormat('es-ES', {
+    day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+
+  function euro(n) { return fmtEuro.format(Number(n) || 0); }
+  function euroCorto(n) { return fmtEuroCorto.format(Number(n) || 0); }
+  function numero(n) { return fmtNum.format(Number(n) || 0); }
+  function fecha(d) { return fmtFecha.format(d); }
+  function porcentaje(parte, total) {
+    if (!total) { return '0 %'; }
+    return (Math.round((parte / total) * 1000) / 10).toString().replace('.', ',') + ' %';
+  }
+
+  /* el(tag, props, hijos) — constructor de nodos sin innerHTML, para que ningún
+     nombre de municipio que venga de un fichero pueda inyectar marcado. */
+  function el(tag, props, hijos) {
+    var nodo = document.createElement(tag);
+    if (props) {
+      Object.keys(props).forEach(function (k) {
+        var v = props[k];
+        if (v == null || v === false) { return; }
+        if (k === 'class') { nodo.className = v; }
+        else if (k === 'text') { nodo.textContent = v; }
+        else if (k === 'html') { nodo.innerHTML = v; }
+        else if (k.slice(0, 2) === 'on' && typeof v === 'function') {
+          nodo.addEventListener(k.slice(2).toLowerCase(), v);
+        } else if (k === 'dataset') {
+          Object.keys(v).forEach(function (d) { nodo.dataset[d] = v[d]; });
+        } else if (v === true) { nodo.setAttribute(k, ''); }
+        else { nodo.setAttribute(k, v); }
+      });
+    }
+    (Array.isArray(hijos) ? hijos : (hijos != null ? [hijos] : []))
+      .forEach(function (h) {
+        if (h == null || h === false) { return; }
+        nodo.appendChild(typeof h === 'string' ? document.createTextNode(h) : h);
+      });
+    return nodo;
+  }
+
+  function vaciar(nodo) {
+    while (nodo.firstChild) { nodo.removeChild(nodo.firstChild); }
+    return nodo;
+  }
+
+  /* Iconos en línea, para no depender de ninguna fuente externa. */
+  var TRAZOS = {
+    dashboard: 'M3 3h7v7H3zM14 3h7v4h-7zM14 10h7v11h-7zM3 13h7v8H3z',
+    ajustes: 'M12 15a3 3 0 100-6 3 3 0 000 6z M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008.6 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 8.6a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9v0a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z',
+    carga: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4 M17 8l-5-5-5 5 M12 3v12',
+    grupo: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2 M9 11a4 4 0 100-8 4 4 0 000 8 M23 21v-2a4 4 0 00-3-3.87 M16 3.13a4 4 0 010 7.75',
+    euro: 'M4 10h12 M4 14h9 M18 6.4A7 7 0 108 17.6',
+    edificio: 'M3 21h18 M5 21V7l7-4 7 4v14 M9 9h.01 M9 13h.01 M9 17h.01 M15 9h.01 M15 13h.01 M15 17h.01',
+    documento: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6 M16 13H8 M16 17H8',
+    menu: 'M3 12h18 M3 6h18 M3 18h18',
+    aviso: 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z M12 9v4 M12 17h.01',
+    check: 'M20 6L9 17l-5-5',
+    descarga: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4 M7 10l5 5 5-5 M12 15V3',
+    imprimir: 'M6 9V2h12v7 M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2 M6 14h12v8H6z',
+    identidad: 'M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2z M9 12a2 2 0 100-4 2 2 0 000 4z M6 16c.5-1.5 1.7-2 3-2s2.5.5 3 2 M15 10h4 M15 14h4',
+    escudo: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+    mesa: 'M3 10h18 M5 10V6a2 2 0 012-2h10a2 2 0 012 2v4 M6 10v10 M18 10v10 M9 14h6',
+    tableta: 'M5 2h14a1 1 0 011 1v18a1 1 0 01-1 1H5a1 1 0 01-1-1V3a1 1 0 011-1z M12 18h.01',
+    papelera: 'M3 6h18 M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2 M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6 M10 11v6 M14 11v6',
+    refrescar: 'M23 4v6h-6 M1 20v-6h6 M3.51 9a9 9 0 0114.85-3.36L23 10 M1 14l4.64 4.36A9 9 0 0020.49 15'
+  };
+
+  function icono(nombre, tam) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', tam || 20);
+    svg.setAttribute('height', tam || 20);
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.8');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.classList.add('ico');
+    (TRAZOS[nombre] || '').split(' M').forEach(function (d, i) {
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', i === 0 ? d : 'M' + d);
+      svg.appendChild(path);
+    });
+    return svg;
+  }
+
+  /* Gráfica de barras horizontales para comparar magnitudes.
+     Una sola tinta: la categoría ya está en el eje, así que el color no tiene
+     que codificar identidad. Cada barra lleva su valor escrito al lado, de modo
+     que la lectura nunca depende sólo del color ni de la longitud. */
+  function barras(items, opciones) {
+    opciones = opciones || {};
+    var contenedor = el('div', { class: 'gr-barras' });
+    var visibles = items.filter(function (i) { return Number(i.valor) > 0; });
+
+    if (!visibles.length) {
+      contenedor.appendChild(el('p', {
+        class: 'gr-vacia',
+        text: opciones.vacio || 'Sin importes que representar con la selección actual.'
+      }));
+      return contenedor;
+    }
+
+    var max = Math.max.apply(null, visibles.map(function (i) { return Number(i.valor); }));
+    var total = visibles.reduce(function (a, i) { return a + Number(i.valor); }, 0);
+    var formato = opciones.formato || euroCorto;
+
+    /* En columnas estrechas la etiqueta y el valor comparten una línea y la
+       barra ocupa el ancho completo debajo: así ningún nombre se recorta. */
+    if (opciones.compacta) { contenedor.classList.add('compacta'); }
+
+    visibles
+      .slice()
+      .sort(function (a, b) { return b.valor - a.valor; })
+      .slice(0, opciones.limite || 100)
+      .forEach(function (item) {
+        var pct = max ? (item.valor / max) * 100 : 0;
+        var descripcion = item.etiqueta + ': ' + euro(item.valor) +
+          ' (' + porcentaje(item.valor, total) + ' de lo representado)';
+        var barra = el('div', { class: 'gr-pista' }, [
+          el('div', { class: 'gr-barra', style: 'width:' + Math.max(pct, 0.8) + '%' })
+        ]);
+
+        if (opciones.compacta) {
+          contenedor.appendChild(el('div', { class: 'gr-fila', title: descripcion }, [
+            el('div', { class: 'gr-cabeza' }, [
+              el('span', { class: 'gr-etiqueta', text: item.etiqueta }),
+              el('span', { class: 'gr-valor num', text: formato(item.valor) })
+            ]),
+            barra
+          ]));
+          return;
+        }
+
+        contenedor.appendChild(el('div', { class: 'gr-fila', title: descripcion }, [
+          el('span', { class: 'gr-etiqueta', text: item.etiqueta }),
+          barra,
+          el('span', { class: 'gr-valor num', text: formato(item.valor) })
+        ]));
+      });
+
+    return contenedor;
+  }
+
+  /* Diálogo de confirmación propio.
+     No se usa window.confirm porque cuando la página va dentro de un iframe con
+     sandbox —como la vista previa— el navegador ignora la llamada y devuelve
+     false sin avisar, de modo que toda acción que dependiera de ella quedaba
+     muerta en silencio. Lo mismo vale para alert() y print(). */
+  function confirmar(opciones) {
+    var previo = document.querySelector('.velo-modal');
+    if (previo) { previo.remove(); }
+
+    var devuelto = false;
+    function cerrar(aceptado) {
+      if (devuelto) { return; }
+      devuelto = true;
+      document.removeEventListener('keydown', alPulsar, true);
+      velo.remove();
+      if (aceptado && opciones.alConfirmar) { opciones.alConfirmar(); }
+    }
+
+    function alPulsar(e) {
+      if (e.key === 'Escape') { e.preventDefault(); cerrar(false); }
+    }
+
+    var botonConfirmar = el('button', {
+      class: 'btn' + (opciones.peligro ? ' peligro-solido' : ''),
+      onClick: function () { cerrar(true); }
+    }, opciones.textoConfirmar || 'Confirmar');
+
+    var cuerpo = [
+      el('h2', { id: 'titulo-modal', text: opciones.titulo })
+    ];
+    (opciones.parrafos || []).forEach(function (p) {
+      cuerpo.push(el('p', { text: p }));
+    });
+    if (opciones.lista && opciones.lista.length) {
+      cuerpo.push(el('ul', { class: 'lista-modal' }, opciones.lista.map(function (t) {
+        return el('li', { text: t });
+      })));
+    }
+    if (opciones.aviso) {
+      cuerpo.push(el('p', { class: 'nota-modal', text: opciones.aviso }));
+    }
+
+    var dialogo = el('div', {
+      class: 'modal',
+      role: 'dialog',
+      'aria-modal': 'true',
+      'aria-labelledby': 'titulo-modal',
+      onClick: function (e) { e.stopPropagation(); }
+    }, [
+      el('div', { class: 'cuerpo-modal' }, cuerpo),
+      el('div', { class: 'pie-modal' }, [
+        el('button', {
+          class: 'btn secundario',
+          onClick: function () { cerrar(false); }
+        }, opciones.textoCancelar || 'Cancelar'),
+        botonConfirmar
+      ])
+    ]);
+
+    var velo = el('div', {
+      class: 'velo-modal',
+      onClick: function () { cerrar(false); }
+    }, [dialogo]);
+
+    document.body.appendChild(velo);
+    document.addEventListener('keydown', alPulsar, true);
+    botonConfirmar.focus();
+  }
+
+  /* Dentro de un iframe con sandbox el navegador también ignora window.print(),
+     así que hace falta saberlo para ofrecer otra salida. */
+  function enMarco() {
+    try { return window.self !== window.top; } catch (e) { return true; }
+  }
+
+  var temporizadorAviso = null;
+  function flotante(mensaje, esError) {
+    var previo = document.querySelector('.aviso-flotante');
+    if (previo) { previo.remove(); }
+    if (temporizadorAviso) { clearTimeout(temporizadorAviso); }
+
+    var nodo = el('div', {
+      class: 'aviso-flotante' + (esError ? ' error' : ''),
+      role: 'status',
+      'aria-live': 'polite',
+      text: mensaje
+    });
+    document.body.appendChild(nodo);
+    temporizadorAviso = setTimeout(function () { nodo.remove(); }, esError ? 7000 : 3500);
+  }
+
+  /* Descarga en cliente, sin pasar por el servidor. */
+  function descargar(nombre, contenido, tipo) {
+    var blob = new Blob(['﻿' + contenido], { type: (tipo || 'text/csv') + ';charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = el('a', { href: url, download: nombre });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function aCSV(filas) {
+    return filas.map(function (fila) {
+      return fila.map(function (celda) {
+        var t = celda == null ? '' : String(celda);
+        return /[";\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+      }).join(';');
+    }).join('\r\n');
+  }
+
+  App.ui = {
+    el: el,
+    vaciar: vaciar,
+    icono: icono,
+    euro: euro,
+    euroCorto: euroCorto,
+    numero: numero,
+    fecha: fecha,
+    porcentaje: porcentaje,
+    barras: barras,
+    confirmar: confirmar,
+    enMarco: enMarco,
+    flotante: flotante,
+    descargar: descargar,
+    aCSV: aCSV
+  };
+})(window.App = window.App || {});
+
+/* ===== 50-vista-config.js ===== */
+/* Vista "Configuración de Importes": define lo que cobra cada tipología. */
+(function (App) {
+  'use strict';
+
+  var el = App.ui.el;
+  var icono = App.ui.icono;
+
+  /* Campo numérico que escribe directamente en una ruta del estado
+     ("config.representantes.PD0"). Devuelve el nodo listo para insertar. */
+  function campoImporte(etiqueta, ruta, opciones) {
+    opciones = opciones || {};
+    var estado = App.store.estado();
+    var partes = ruta.split('.');
+    var contenedor = estado;
+    for (var i = 0; i < partes.length - 1; i++) { contenedor = contenedor[partes[i]]; }
+    var clave = partes[partes.length - 1];
+
+    var input = el('input', {
+      type: 'number',
+      min: '0',
+      step: opciones.paso || '0.01',
+      value: contenedor[clave],
+      'aria-label': etiqueta,
+      onInput: function (e) {
+        var v = parseFloat(e.target.value);
+        App.store.muta(function (s) {
+          var c = s;
+          for (var j = 0; j < partes.length - 1; j++) { c = c[partes[j]]; }
+          c[partes[partes.length - 1]] = isNaN(v) ? 0 : v;
+        });
+      }
+    });
+
+    var envoltorio = opciones.sinEuro
+      ? el('div', { class: 'campo-euro sin' }, [input])
+      : el('div', { class: 'campo-euro' }, [input]);
+
+    if (opciones.linea) {
+      return el('div', { class: 'campo-linea' }, [
+        el('label', { text: etiqueta }),
+        envoltorio
+      ]);
+    }
+    return el('div', { class: 'campo' }, [
+      el('label', { text: etiqueta }),
+      envoltorio
+    ]);
+  }
+
+  function tarjetaRepresentantes() {
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('grupo'), 'Representantes de la Administración'])
+      ]),
+      el('p', {
+        class: 'silencio',
+        text: 'Importe por representante y tipología. El gasto de cada municipio es la suma de sus representantes multiplicados por la tarifa de su tipología.'
+      }),
+      el('div', { class: 'rejilla tres', style: 'margin-top:18px' },
+        App.store.TIPOLOGIAS_PD.map(function (t) {
+          return campoImporte('Tarifa ' + t + ' (€)', 'config.representantes.' + t);
+        })
+      )
+    ]);
+  }
+
+  function tarjetaSecretarios() {
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('identidad'), 'Secretarios de Ayuntamiento'])
+      ]),
+      el('p', {
+        class: 'silencio',
+        text: 'Un secretario por municipio. El importe depende del tramo en el que caiga el número de mesas del municipio.'
+      }),
+      el('div', { class: 'apilar junto', style: 'margin-top:18px' }, [
+        campoImporte('Tramo 1 — hasta 10 mesas', 'config.secretarios.hasta10', { linea: true }),
+        campoImporte('Tramo 2 — de 11 a 50 mesas', 'config.secretarios.de11a50', { linea: true }),
+        campoImporte('Tramo 3 — más de 50 mesas', 'config.secretarios.mas50', { linea: true })
+      ])
+    ]);
+  }
+
+  function tarjetaFijas() {
+    var cfg = App.store.estado().config;
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('euro'), 'Tarifas fijas por municipio y por mesa'])
+      ]),
+      el('div', { class: 'rejilla tres' }, [
+        el('div', { class: 'apilar junto' }, [
+          el('p', { class: 'silencio', text: 'Importe fijo por municipio' }),
+          campoImporte('Jueces de Paz', 'config.juecesPaz', { linea: true })
+        ]),
+        el('div', { class: 'apilar junto' }, [
+          el('p', { class: 'silencio', text: 'Importe por cada mesa del municipio' }),
+          campoImporte('Acondicionamiento de locales', 'config.acondicionamiento', { linea: true }),
+          campoImporte('Personal colaborador', 'config.personalColaborador', { linea: true }),
+          campoImporte('Montaje y transporte', 'config.montajeTransporte', { linea: true })
+        ]),
+        el('div', { class: 'apilar junto' }, [
+          el('p', { class: 'silencio', text: 'Importe por unidad de personal' }),
+          campoImporte('Policía — por efectivo', 'config.policia', { linea: true }),
+          campoImporte('Miembro de mesa', 'config.miembrosMesa', { linea: true }),
+          campoImporte('Miembros por mesa (nº)', 'config.miembrosPorMesa', { linea: true, paso: '1', sinEuro: true })
+        ])
+      ]),
+      el('p', {
+        class: 'leyenda-nota',
+        text: 'Miembros de mesa: ' + App.ui.euro(cfg.miembrosMesa) + ' × ' +
+          cfg.miembrosPorMesa + ' miembros × nº de mesas del municipio.'
+      })
+    ]);
+  }
+
+  function tarjetaCoordinadores() {
+    var c = App.store.estado().config.coordinadores;
+    var total = App.calc.calcularCoordinadores(App.store.estado());
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('tableta'), 'Coordinadores de tablets'])
+      ]),
+      el('div', { class: 'aviso' }, [
+        icono('aviso'),
+        el('div', {}, [
+          el('strong', { text: 'Concepto no territorializado. ' }),
+          'Los coordinadores están en colegios electorales, y los colegios todavía no se modelan. ' +
+          'Por eso su número se introduce aquí como total y su importe se informa siempre por separado: ' +
+          'no se reparte entre municipios, islas ni provincias, y sólo entra en el total general.'
+        ])
+      ]),
+      el('div', { class: 'rejilla dos', style: 'margin-top:18px' }, [
+        el('div', { class: 'apilar junto' }, [
+          el('p', { class: 'silencio', text: 'Colegios de hasta 10 mesas' }),
+          campoImporte('Tarifa por coordinador', 'config.coordinadores.tarifaHasta10', { linea: true }),
+          campoImporte('Nº de coordinadores', 'config.coordinadores.numHasta10', { linea: true, paso: '1', sinEuro: true })
+        ]),
+        el('div', { class: 'apilar junto' }, [
+          el('p', { class: 'silencio', text: 'Colegios de 11 mesas o más' }),
+          campoImporte('Tarifa por coordinador', 'config.coordinadores.tarifaDesde11', { linea: true }),
+          campoImporte('Nº de coordinadores', 'config.coordinadores.numDesde11', { linea: true, paso: '1', sinEuro: true })
+        ])
+      ]),
+      el('p', {
+        class: 'leyenda-nota',
+        text: 'Total coordinadores: ' + App.ui.numero(c.numHasta10 + c.numDesde11) +
+          ' personas · ' + App.ui.euro(total.total)
+      })
+    ]);
+  }
+
+  function tarjetaConvocatoria() {
+    var estado = App.store.estado();
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('documento'), 'Convocatoria'])
+      ]),
+      el('div', { class: 'campo' }, [
+        el('label', { text: 'Nombre del proceso electoral (aparece en los informes)' }),
+        el('input', {
+          type: 'text',
+          value: estado.convocatoria,
+          onInput: function (e) {
+            App.store.muta(function (s) { s.convocatoria = e.target.value; });
+          }
+        })
+      ])
+    ]);
+  }
+
+  App.vistas = App.vistas || {};
+  App.vistas.configuracion = {
+    titulo: 'Configuración de Importes',
+    subtitulo: 'Defina los parámetros económicos del proceso. Los cambios se guardan al instante y recalculan todos los informes.',
+    render: function () {
+      return el('div', { class: 'apilar', style: 'gap:24px' }, [
+        tarjetaConvocatoria(),
+        el('div', { class: 'rejilla principal-lateral' }, [
+          tarjetaRepresentantes(),
+          tarjetaSecretarios()
+        ]),
+        tarjetaFijas(),
+        tarjetaCoordinadores()
+      ]);
+    }
+  };
+})(window.App = window.App || {});
+
+/* ===== 60-vista-datos.js ===== */
+/* Vista "Carga de Datos": los censos que alimentan los cálculos.
+   Un mismo fichero puede traer varios censos, así que hay una sola zona de carga
+   que detecta por la cabecera qué contiene y actualiza lo que corresponda. */
+(function (App) {
+  'use strict';
+
+  var el = App.ui.el;
+  var icono = App.ui.icono;
+
+  var CENSOS = [
+    {
+      id: 'mesas',
+      titulo: 'Mesas por municipio',
+      icono: 'mesa',
+      columnas: 'MESAS',
+      descripcion: 'Base de casi todos los cálculos: acondicionamiento, personal, montaje, miembros de mesa y el tramo del secretario.',
+      mapa: function (s) { return s.mesas; },
+      fijar: function (s, m) { s.mesas = m; }
+    },
+    {
+      id: 'representantes',
+      titulo: 'Representantes de la Administración',
+      icono: 'grupo',
+      columnas: 'PD0 … PD5',
+      descripcion: 'Número de representantes de cada tipología. Cada uno cobra según su tipología.',
+      mapa: function (s) { return s.representantes; },
+      fijar: function (s, m) { s.representantes = m; }
+    },
+    {
+      id: 'policia',
+      titulo: 'Efectivos de policía',
+      icono: 'escudo',
+      columnas: 'EFECTIVOS',
+      descripcion: 'Efectivos de Policía Autonómica y Local por municipio. Suele llegar en un fichero aparte.',
+      mapa: function (s) { return s.policia; },
+      fijar: function (s, m) { s.policia = m; }
+    }
+  ];
+
+  function censo(id) {
+    for (var i = 0; i < CENSOS.length; i++) {
+      if (CENSOS[i].id === id) { return CENSOS[i]; }
+    }
+    return null;
+  }
+
+  function cuantos(id) {
+    return Object.keys(censo(id).mapa(App.store.estado()) || {}).length;
+  }
+
+  /* Resultado de la última importación, fuera del DOM: el repintado que sigue a
+     la carga se llevaría por delante cualquier aviso guardado en el nodo. */
+  var ultima = null;
+
+  /* ---------- Importación ---------- */
+
+  function importar(file) {
+    ultima = { leyendo: true, fichero: file.name };
+    App.render();
+
+    App.parsers.leerFichero(file)
+      .then(function (filas) {
+        var res = App.parsers.interpretarFicheroDatos(filas);
+
+        var resumen = res.bloques.map(function (b) {
+          var previos = censo(b.id).mapa(App.store.estado()) || {};
+          var nuevos = 0;
+          Object.keys(b.datos).forEach(function (c) {
+            if (previos[c] === undefined) { nuevos += 1; }
+          });
+          return {
+            id: b.id, nombre: b.nombre, municipios: b.municipios,
+            nuevos: nuevos, actualizados: b.municipios - nuevos
+          };
+        });
+
+        /* Se fusiona en vez de reemplazar: así un fichero por provincia se puede
+           cargar en dos veces sin que el segundo borre al primero. Para empezar
+           de cero está el botón de borrar de cada censo. */
+        App.store.muta(function (s) {
+          res.bloques.forEach(function (b) {
+            var c = censo(b.id);
+            var mezcla = {};
+            var actual = c.mapa(s) || {};
+            Object.keys(actual).forEach(function (k) { mezcla[k] = actual[k]; });
+            Object.keys(b.datos).forEach(function (k) { mezcla[k] = b.datos[k]; });
+            c.fijar(s, mezcla);
+            s.cargas[b.id] = {
+              fecha: new Date().toISOString(),
+              fichero: file.name,
+              filas: b.municipios
+            };
+          });
+        });
+
+        ultima = { fichero: file.name, res: res, resumen: resumen };
+        App.ui.flotante(
+          resumen.map(function (r) { return r.nombre.toLowerCase(); }).join(' y ') +
+          ' actualizados desde ' + file.name
+        );
+        App.render();
+      })
+      .catch(function (err) {
+        console.error(err);
+        ultima = { fichero: file.name, error: err.message };
+        App.ui.flotante('No se pudo importar ' + file.name, true);
+        App.render();
+      });
+  }
+
+  /* ---------- Zona de carga ---------- */
+
+  function zonaCarga() {
+    var input = el('input', {
+      type: 'file',
+      accept: '.csv,.tsv,.txt,.xlsx',
+      onChange: function (e) {
+        if (e.target.files && e.target.files[0]) { importar(e.target.files[0]); }
+        e.target.value = '';
+      }
+    });
+
+    var zona = el('div', {
+      class: 'zona-carga grande',
+      tabindex: '0',
+      role: 'button',
+      'aria-label': 'Cargar fichero de datos',
+      onClick: function () { input.click(); },
+      onKeydown: function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+      },
+      onDragover: function (e) { e.preventDefault(); zona.classList.add('encima'); },
+      onDragleave: function () { zona.classList.remove('encima'); },
+      onDrop: function (e) {
+        e.preventDefault();
+        zona.classList.remove('encima');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) { importar(e.dataTransfer.files[0]); }
+      }
+    }, [
+      el('div', { class: 'icono-zona' }, [icono('carga', 26)]),
+      el('h3', { text: 'Arrastre aquí el CSV o Excel, o pulse para seleccionarlo' }),
+      el('p', {
+        class: 'pista',
+        text: 'Un mismo fichero puede traer varios censos: se detectan por la cabecera y se cargan de una vez.'
+      }),
+      input
+    ]);
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('carga'), 'Cargar datos']),
+        el('button', {
+          class: 'btn secundario pequeno',
+          onClick: descargarPlantillas
+        }, [icono('descarga', 14), 'Plantillas CSV'])
+      ]),
+      zona,
+      el('div', { class: 'rejilla tres', style: 'margin-top:20px' }, CENSOS.map(function (c) {
+        return el('div', { class: 'columna-reconocida' }, [
+          el('div', { class: 'fila' }, [
+            icono(c.icono, 16),
+            el('strong', { text: c.titulo })
+          ]),
+          el('code', { class: 'cabecera-esperada', text: c.columnas }),
+          el('p', { class: 'silencio', text: c.descripcion })
+        ]);
+      })),
+      el('p', {
+        class: 'leyenda-nota',
+        text: 'La columna de municipios debe llamarse MUNICIPIOS (o CÓDIGO / NOMBRE) y admite «35001», «AGAETE» o «35001 AGAETE». ' +
+          'Las columnas que no se reconocen se ignoran sin estorbar; si hay una PROVINCIA, se usa para comprobar que concuerda con el código. ' +
+          'Los municipios del fichero se actualizan y el resto se conserva, de modo que se puede cargar una provincia hoy y la otra mañana. ' +
+          'Si el fichero trae una fila de TOTALES, se usa para comprobar que lo importado cuadra.'
+      })
+    ]);
+  }
+
+  /* ---------- Avisos de la última importación ---------- */
+
+  function tarjetaResultado() {
+    if (!ultima) { return null; }
+
+    if (ultima.leyendo) {
+      return el('section', { class: 'tarjeta' }, [
+        el('p', { class: 'silencio', text: 'Leyendo ' + ultima.fichero + '…' })
+      ]);
+    }
+
+    if (ultima.error) {
+      return el('section', { class: 'tarjeta' }, [
+        el('div', { class: 'aviso error' }, [
+          icono('aviso'),
+          el('div', {}, [
+            el('strong', { text: ultima.fichero + ' — ' }),
+            ultima.error
+          ])
+        ])
+      ]);
+    }
+
+    var res = ultima.res;
+    var partes = [];
+
+    partes.push(el('div', { class: 'rejilla tres' }, ultima.resumen.map(function (r) {
+      return el('div', { class: 'tarjeta kpi', style: 'box-shadow:none' }, [
+        el('span', { class: 'etiqueta', text: r.nombre }),
+        el('span', { class: 'valor num destacado', text: App.ui.numero(r.municipios) }),
+        el('span', {
+          class: 'nota',
+          text: 'municipios · ' + r.nuevos + ' nuevos, ' + r.actualizados + ' actualizados'
+        })
+      ]);
+    })));
+
+    if (res.comprobacion) {
+      var c = res.comprobacion;
+      partes.push(el('div', { class: 'aviso ' + (c.cuadra ? 'ok' : 'error') }, [
+        icono(c.cuadra ? 'check' : 'aviso'),
+        el('div', {}, [
+          el('strong', {
+            text: c.cuadra
+              ? 'Cuadra con la fila TOTALES del fichero. '
+              : 'No cuadra con la fila TOTALES del fichero. '
+          }),
+          c.cuadra
+            ? 'Comprobado: ' + c.lineas.map(function (l) {
+                return l.columna + ' ' + App.ui.numero(l.declarado);
+              }).join(' · ')
+            : null,
+          c.cuadra ? null : el('ul', { style: 'margin:8px 0 0;padding-left:20px' },
+            c.lineas.filter(function (l) { return !l.cuadra; }).map(function (l) {
+              return el('li', {
+                text: l.columna + ': el fichero declara ' + App.ui.numero(l.declarado) +
+                  ' y la suma de sus filas da ' + App.ui.numero(l.calculado)
+              });
+            })
+          )
+        ])
+      ]));
+    }
+
+    /* Un representante por mesa: se informa, no se impone. */
+    if (res.repVsMesas) {
+      var rm = res.repVsMesas;
+      partes.push(el('div', { class: 'aviso ' + (rm.desajustes.length ? '' : 'ok') }, [
+        icono(rm.desajustes.length ? 'aviso' : 'check'),
+        el('div', {}, [
+          rm.desajustes.length
+            ? el('strong', {
+                text: rm.desajustes.length + ' municipio(s) donde los representantes no igualan a las mesas. '
+              })
+            : el('strong', {
+                text: 'Un representante por mesa en los ' + rm.coinciden + ' municipios. '
+              }),
+          rm.desajustes.length
+            ? 'En el resto sí coinciden. Se ha importado lo que dice el fichero; compruebe si es intencionado:'
+            : 'La suma de PD0…PD5 coincide con el número de mesas en todos ellos.',
+          rm.desajustes.length
+            ? el('ul', { style: 'margin:8px 0 0;padding-left:20px' },
+                rm.desajustes.slice(0, 6).map(function (d) {
+                  return el('li', {
+                    text: d.nombre + ': ' + d.representantes + ' representantes frente a ' + d.mesas + ' mesas'
+                  });
+                })
+              )
+            : null
+        ])
+      ]));
+    }
+
+    /* Se listan TODAS, no una muestra: para arreglar el fichero hay que saber
+       exactamente qué filas se quedaron fuera. */
+    if (res.noReconocidos.length) {
+      partes.push(el('div', { class: 'aviso' }, [
+        icono('aviso'),
+        el('div', { style: 'min-width:0;flex:1' }, [
+          el('strong', { text: res.noReconocidos.length + ' fila(s) sin municipio reconocible, ignoradas. ' }),
+          'Revise cómo está escrito el municipio en estas filas:',
+          el('ul', { class: 'lista-rechazos' },
+            res.noReconocidos.map(function (t) { return el('li', { text: t }); })
+          ),
+          el('button', {
+            class: 'btn secundario pequeno',
+            style: 'margin-top:10px',
+            onClick: function () {
+              App.ui.descargar(
+                'filas-no-reconocidas.csv',
+                App.ui.aCSV([['VALOR EN EL FICHERO']].concat(
+                  res.noReconocidos.map(function (t) { return [t]; })
+                ))
+              );
+            }
+          }, [icono('descarga', 14), 'Descargar la lista'])
+        ])
+      ]));
+    }
+
+    if (res.provinciasDiscordantes && res.provinciasDiscordantes.length) {
+      partes.push(el('div', { class: 'aviso error' }, [
+        icono('aviso'),
+        el('div', {}, [
+          el('strong', {
+            text: res.provinciasDiscordantes.length + ' fila(s) cuya columna PROVINCIA no concuerda con el código. '
+          }),
+          'La provincia se deduce siempre del código del municipio, así que los datos están donde deben; ' +
+          'pero revise el fichero, porque suele delatar filas mal copiadas:',
+          el('ul', { style: 'margin:8px 0 0;padding-left:20px' },
+            res.provinciasDiscordantes.slice(0, 5).map(function (d) {
+              return el('li', {
+                text: '«' + d.texto + '» — el fichero dice ' + d.declarada + ' y por código es ' + d.real
+              });
+            })
+          )
+        ])
+      ]));
+    }
+
+    if (res.discrepancias.length) {
+      partes.push(el('div', { class: 'aviso error' }, [
+        icono('aviso'),
+        el('div', {}, [
+          el('strong', {
+            text: res.discrepancias.length + ' fila(s) con el código y el nombre en desacuerdo. '
+          }),
+          'Los datos se han importado usando el código. Revise si el fichero sigue otra codificación:',
+          el('ul', { style: 'margin:8px 0 0;padding-left:20px' },
+            res.discrepancias.slice(0, 5).map(function (d) {
+              return el('li', {
+                text: '«' + d.texto + '» — el código ' + d.codigo + ' corresponde a ' + d.nombreEsperado
+              });
+            })
+          ),
+          res.discrepancias.length > 5
+            ? el('p', { style: 'margin-top:6px', text: 'y ' + (res.discrepancias.length - 5) + ' más.' })
+            : null
+        ])
+      ]));
+    }
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('documento'), 'Resultado de la importación']),
+        el('span', { class: 'silencio', text: ultima.fichero })
+      ]),
+      el('div', { class: 'apilar' }, partes)
+    ]);
+  }
+
+  /* ---------- Estado de los censos ---------- */
+
+  function borrarCenso(c) {
+    App.ui.confirmar({
+      titulo: 'Borrar «' + c.titulo + '»',
+      parrafos: [
+        'Se borrarán los datos de ' + cuantos(c.id) + ' municipios de este censo.',
+        'Las tarifas de la configuración no se tocan, y los demás censos se quedan como están.'
+      ],
+      textoConfirmar: 'Borrar el censo',
+      peligro: true,
+      alConfirmar: function () {
+        App.store.muta(function (s) {
+          c.fijar(s, {});
+          delete s.cargas[c.id];
+        });
+        App.ui.flotante('Datos de «' + c.titulo + '» borrados');
+        App.render();
+      }
+    });
+  }
+
+  function tarjetaCensos() {
+    var estado = App.store.estado();
+    var total = App.geo.MUNICIPIOS.length;
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [el('h2', {}, [icono('documento'), 'Censos cargados'])]),
+      el('div', { class: 'rejilla tres' }, CENSOS.map(function (c) {
+        var n = cuantos(c.id);
+        var carga = estado.cargas[c.id];
+
+        return el('div', { class: 'ficha-censo' }, [
+          el('div', { class: 'entre' }, [
+            el('div', { class: 'fila' }, [icono(c.icono, 18), el('strong', { text: c.titulo })]),
+            n
+              ? el('span', { class: 'chip ok' }, [icono('check', 13), n + ' / ' + total])
+              : el('span', { class: 'chip pendiente', text: 'Sin datos' })
+          ]),
+          n && carga
+            ? el('p', {
+                class: 'silencio',
+                text: carga.fichero + ' · ' + App.ui.fecha(new Date(carga.fecha))
+              })
+            : el('p', { class: 'silencio', text: 'Cargue un fichero con la columna ' + c.columnas + '.' }),
+          n
+            ? el('button', {
+                class: 'btn peligro pequeno',
+                onClick: function () { borrarCenso(c); }
+              }, [icono('papelera', 14), 'Borrar este censo'])
+            : null
+        ]);
+      }))
+    ]);
+  }
+
+  /* ---------- Tabla de comprobación ---------- */
+
+  function tablaEstadoDatos() {
+    var estado = App.store.estado();
+    var filas = App.geo.MUNICIPIOS.map(function (m) {
+      var reps = estado.representantes[m.codigo] || {};
+      var totalReps = App.store.TIPOLOGIAS_PD.reduce(function (a, t) {
+        return a + (Number(reps[t]) || 0);
+      }, 0);
+      return {
+        m: m,
+        mesas: Number(estado.mesas[m.codigo]) || 0,
+        reps: totalReps,
+        policia: Number(estado.policia[m.codigo]) || 0
+      };
+    }).filter(function (f) { return f.mesas || f.reps || f.policia; });
+
+    if (!filas.length) {
+      return el('section', { class: 'tarjeta' }, [
+        el('header', {}, [el('h2', {}, [icono('documento'), 'Datos por municipio'])]),
+        el('p', {
+          class: 'sin-datos',
+          text: 'Todavía no hay datos cargados. Empiece por las mesas: sin ellas no hay cálculo posible.'
+        })
+      ]);
+    }
+
+    var cuerpo = el('tbody');
+    filas.forEach(function (f) {
+      cuerpo.appendChild(el('tr', {}, [
+        el('td', { class: 'num', text: f.m.codigo }),
+        el('td', { text: f.m.nombre }),
+        el('td', { text: App.geo.isla(f.m.isla).nombre }),
+        el('td', { class: 'n', text: App.ui.numero(f.mesas) }),
+        el('td', { class: 'n', text: App.ui.numero(f.reps) }),
+        el('td', { class: 'n', text: App.ui.numero(f.policia) })
+      ]));
+    });
+
+    var totales = filas.reduce(function (a, f) {
+      a.mesas += f.mesas; a.reps += f.reps; a.policia += f.policia;
+      return a;
+    }, { mesas: 0, reps: 0, policia: 0 });
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('documento'), 'Datos por municipio']),
+        el('span', {
+          class: 'silencio',
+          text: filas.length + ' de ' + App.geo.MUNICIPIOS.length + ' municipios con datos'
+        })
+      ]),
+      el('div', { class: 'tabla-scroll alta' }, [
+        el('table', {}, [
+          el('thead', {}, [
+            el('tr', {}, [
+              el('th', { text: 'Código' }),
+              el('th', { text: 'Municipio' }),
+              el('th', { text: 'Isla' }),
+              el('th', { class: 'n', text: 'Mesas' }),
+              el('th', { class: 'n', text: 'Representantes' }),
+              el('th', { class: 'n', text: 'Efectivos policía' })
+            ])
+          ]),
+          cuerpo,
+          el('tfoot', {}, [
+            el('tr', {}, [
+              el('td', { colspan: '3', text: 'Total' }),
+              el('td', { class: 'n', text: App.ui.numero(totales.mesas) }),
+              el('td', { class: 'n', text: App.ui.numero(totales.reps) }),
+              el('td', { class: 'n', text: App.ui.numero(totales.policia) })
+            ])
+          ])
+        ])
+      ])
+    ]);
+  }
+
+  /* ---------- Plantillas ---------- */
+
+  function descargarPlantillas() {
+    var datos = [['MUNICIPIOS'].concat(App.store.TIPOLOGIAS_PD).concat(['MESAS'])];
+    var policia = [['MUNICIPIOS', 'EFECTIVOS']];
+
+    App.geo.MUNICIPIOS.forEach(function (m) {
+      var etiqueta = m.codigo + ' ' + m.nombre;
+      datos.push([etiqueta, '', '', '', '', '', '', '']);
+      policia.push([etiqueta, '']);
+    });
+
+    App.ui.descargar('plantilla-representantes-y-mesas.csv', App.ui.aCSV(datos));
+    setTimeout(function () {
+      App.ui.descargar('plantilla-policia.csv', App.ui.aCSV(policia));
+    }, 400);
+    App.ui.flotante('Descargando las plantillas con los 88 municipios');
+  }
+
+  /* ---------- Convocatoria ---------- */
+
+  function nombreCopia() {
+    var conv = App.store.estado().convocatoria || 'proceso';
+    var limpio = App.geo.normaliza(conv).replace(/ /g, '-') || 'proceso';
+    return 'gastos-' + limpio + '-' + new Date().toISOString().slice(0, 10) + '.json';
+  }
+
+  function botonRestaurar() {
+    var input = el('input', {
+      type: 'file', accept: '.json', style: 'display:none',
+      onChange: function (e) {
+        var f = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (!f) { return; }
+        f.text().then(function (txt) {
+          App.store.importar(JSON.parse(txt));
+          ultima = null;
+          App.ui.flotante('Copia restaurada');
+          App.render();
+        }).catch(function () {
+          App.ui.flotante('El fichero no es una copia válida', true);
+        });
+      }
+    });
+    return el('span', {}, [
+      el('button', {
+        class: 'btn secundario',
+        onClick: function () { input.click(); }
+      }, [icono('carga', 16), 'Restaurar copia']),
+      input
+    ]);
+  }
+
+  function hayDatos() {
+    return CENSOS.some(function (c) { return cuantos(c.id) > 0; });
+  }
+
+  function borrarTodosLosCensos() {
+    App.ui.confirmar({
+      titulo: 'Borrar todos los censos',
+      parrafos: ['Se borrarán por completo:'],
+      lista: CENSOS
+        .filter(function (c) { return cuantos(c.id) > 0; })
+        .map(function (c) { return c.titulo + ' — ' + cuantos(c.id) + ' municipios'; }),
+      aviso: 'Las tarifas se conservan. Si aún no ha exportado una copia de esta convocatoria, cancele y expórtela primero.',
+      textoConfirmar: 'Borrar los censos',
+      peligro: true,
+      alConfirmar: function () {
+        App.store.muta(function (s) {
+          CENSOS.forEach(function (c) { c.fijar(s, {}); });
+          s.cargas = {};
+        });
+        ultima = null;
+        App.ui.flotante('Censos borrados. Las tarifas siguen configuradas.');
+        App.render();
+      }
+    });
+  }
+
+  function tarjetaConvocatoria() {
+    var estado = App.store.estado();
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('refrescar'), 'Cambio de convocatoria']),
+        hayDatos()
+          ? el('span', { class: 'chip ok', text: estado.convocatoria })
+          : el('span', { class: 'chip pendiente', text: 'Sin censos cargados' })
+      ]),
+      el('p', {
+        class: 'silencio',
+        text: 'Para reutilizar la herramienta en otro proceso electoral: exporte una copia de la convocatoria actual, borre los censos y cargue los nuevos. Las tarifas se mantienen para que sólo tenga que retocar lo que haya cambiado.'
+      }),
+
+      el('div', { class: 'fila', style: 'margin-top:18px' }, [
+        el('button', {
+          class: 'btn secundario',
+          onClick: function () {
+            App.ui.descargar(nombreCopia(), JSON.stringify(App.store.exportar(), null, 2), 'application/json');
+          }
+        }, [icono('descarga', 16), 'Exportar copia (JSON)']),
+        botonRestaurar(),
+        el('button', {
+          class: 'btn peligro',
+          disabled: !hayDatos(),
+          onClick: borrarTodosLosCensos
+        }, [icono('papelera', 16), 'Borrar todos los censos'])
+      ]),
+
+      el('p', {
+        class: 'leyenda-nota',
+        text: 'La copia en JSON guarda las tarifas y los tres censos de la convocatoria. Restaurarla devuelve ese proceso tal y como estaba, así que sirve para volver a 2023 después de haber trabajado en 2027.'
+      }),
+
+      el('div', { class: 'fila', style: 'margin-top:14px' }, [
+        el('button', {
+          class: 'btn fantasma pequeno',
+          onClick: function () {
+            App.ui.confirmar({
+              titulo: 'Reiniciar la aplicación entera',
+              parrafos: [
+                'Se borrarán las tarifas y todos los censos, dejando la aplicación como recién instalada.'
+              ],
+              aviso: 'Esto no se puede deshacer salvo restaurando una copia JSON.',
+              textoConfirmar: 'Reiniciar todo',
+              peligro: true,
+              alConfirmar: function () {
+                App.store.reiniciar();
+                ultima = null;
+                App.ui.flotante('Aplicación reiniciada por completo');
+                App.render();
+              }
+            });
+          }
+        }, 'Reiniciar también las tarifas')
+      ])
+    ]);
+  }
+
+  App.vistas = App.vistas || {};
+  App.vistas.datos = {
+    titulo: 'Carga de Datos',
+    subtitulo: 'Cargue los censos del proceso desde CSV o Excel. Los municipios se reconocen por código o por nombre, y un mismo fichero puede traer varios censos a la vez.',
+    render: function () {
+      return el('div', { class: 'apilar', style: 'gap:24px' }, [
+        zonaCarga(),
+        tarjetaResultado(),
+        tarjetaCensos(),
+        tablaEstadoDatos(),
+        tarjetaConvocatoria()
+      ]);
+    }
+  };
+})(window.App = window.App || {});
+
+/* ===== 70-vista-dashboard.js ===== */
+/* Vista "Dashboard de Informes": filtros, indicadores, gráficas y tablas. */
+(function (App) {
+  'use strict';
+
+  var el = App.ui.el;
+  var icono = App.ui.icono;
+  var euro = App.ui.euro;
+  var numero = App.ui.numero;
+
+  /* Los filtros viven en memoria durante la sesión: son una consulta, no un dato
+     del proceso electoral, así que no se persisten con el resto del estado. */
+  var filtros = null;
+
+  function filtrosPorDefecto() {
+    return {
+      provincias: App.geo.PROVINCIAS.map(function (p) { return p.id; }),
+      islas: App.geo.ISLAS.map(function (i) { return i.id; }),
+      municipios: App.geo.MUNICIPIOS.map(function (m) { return m.codigo; }),
+      tipos: App.store.COLABORADORES.map(function (c) { return c.id; }),
+      soloActivos: true,
+      busquedaMunicipio: '',
+      busquedaTabla: '',
+      pestana: 'municipio'
+    };
+  }
+
+  function estadoFiltros() {
+    if (!filtros) { filtros = filtrosPorDefecto(); }
+    return filtros;
+  }
+
+  /* ---------- Controles de selección ---------- */
+
+  function alterna(lista, valor, activo) {
+    var i = lista.indexOf(valor);
+    if (activo && i < 0) { lista.push(valor); }
+    if (!activo && i >= 0) { lista.splice(i, 1); }
+  }
+
+  function checklist(opciones) {
+    var f = estadoFiltros();
+    var lista = el('div', { class: 'lista-check' + (opciones.corta ? ' corta' : '') });
+
+    opciones.items.forEach(function (item) {
+      var marcado = opciones.seleccion.indexOf(item.id) >= 0;
+      lista.appendChild(el('label', { class: 'opcion-check' }, [
+        el('input', {
+          type: 'checkbox',
+          checked: marcado,
+          onChange: function (e) {
+            opciones.alCambiar(item.id, e.target.checked);
+            App.render();
+          }
+        }),
+        el('span', { class: 'texto', text: item.nombre }),
+        item.meta ? el('span', { class: 'meta', text: item.meta }) : null
+      ]));
+    });
+
+    if (!opciones.items.length) {
+      lista.appendChild(el('p', { class: 'silencio', style: 'padding:12px', text: 'Nada que mostrar con la selección de arriba.' }));
+    }
+
+    var bloque = el('div', { class: 'grupo-filtro' }, [
+      el('div', { class: 'titulo-filtro' }, [
+        el('strong', { text: opciones.titulo }),
+        el('span', {
+          class: 'cuenta',
+          text: opciones.seleccion.filter(function (id) {
+            return opciones.items.some(function (it) { return it.id === id; });
+          }).length + ' / ' + opciones.items.length
+        })
+      ]),
+      el('div', { class: 'acciones-filtro' }, [
+        el('button', {
+          type: 'button',
+          onClick: function () { opciones.alTodos(true); App.render(); }
+        }, 'Todos'),
+        el('button', {
+          type: 'button',
+          onClick: function () { opciones.alTodos(false); App.render(); }
+        }, 'Ninguno')
+      ])
+    ]);
+
+    if (opciones.buscador) {
+      bloque.appendChild(el('input', {
+        type: 'search',
+        placeholder: 'Buscar municipio…',
+        value: f.busquedaMunicipio,
+        style: 'margin-bottom:8px',
+        onInput: function (e) {
+          f.busquedaMunicipio = e.target.value;
+          App.render({ foco: 'buscador-municipio' });
+        },
+        id: 'buscador-municipio'
+      }));
+    }
+
+    bloque.appendChild(lista);
+    return bloque;
+  }
+
+  function panelFiltros() {
+    var f = estadoFiltros();
+    var estado = App.store.estado();
+
+    var islasVisibles = App.geo.ISLAS.filter(function (i) {
+      return f.provincias.indexOf(i.provincia) >= 0;
+    });
+
+    var termino = App.geo.normaliza(f.busquedaMunicipio);
+    var municipiosVisibles = App.geo.MUNICIPIOS.filter(function (m) {
+      if (f.islas.indexOf(m.isla) < 0) { return false; }
+      if (f.provincias.indexOf(m.provincia) < 0) { return false; }
+      if (termino && App.geo.normaliza(m.nombre).indexOf(termino) < 0 &&
+          m.codigo.indexOf(termino) < 0) { return false; }
+      return true;
+    });
+
+    /* Al desmarcar un ámbito superior se arrastra lo que cuelga de él, para que
+       los contadores del panel no mientan. */
+    function cascadaProvincia(id, activo) {
+      alterna(f.provincias, id, activo);
+      App.geo.islasDe(id).forEach(function (isla) {
+        alterna(f.islas, isla.id, activo);
+        App.geo.municipiosDe(isla.id).forEach(function (m) {
+          alterna(f.municipios, m.codigo, activo);
+        });
+      });
+    }
+
+    function cascadaIsla(id, activo) {
+      alterna(f.islas, id, activo);
+      App.geo.municipiosDe(id).forEach(function (m) {
+        alterna(f.municipios, m.codigo, activo);
+      });
+      if (activo) { alterna(f.provincias, App.geo.isla(id).provincia, true); }
+    }
+
+    return el('aside', { class: 'panel-filtros no-imprimir' }, [
+      el('div', { class: 'entre' }, [
+        el('h2', { text: 'Filtros de informe' }),
+        el('button', {
+          class: 'btn fantasma pequeno',
+          title: 'Restablecer todos los filtros',
+          onClick: function () { filtros = filtrosPorDefecto(); App.render(); }
+        }, 'Reiniciar')
+      ]),
+
+      checklist({
+        titulo: 'Provincia',
+        items: App.geo.PROVINCIAS.map(function (p) { return { id: p.id, nombre: p.nombre }; }),
+        seleccion: f.provincias,
+        corta: true,
+        alCambiar: cascadaProvincia,
+        alTodos: function (v) {
+          App.geo.PROVINCIAS.forEach(function (p) { cascadaProvincia(p.id, v); });
+        }
+      }),
+
+      checklist({
+        titulo: 'Isla',
+        items: islasVisibles.map(function (i) { return { id: i.id, nombre: i.nombre }; }),
+        seleccion: f.islas,
+        corta: true,
+        alCambiar: cascadaIsla,
+        alTodos: function (v) {
+          islasVisibles.forEach(function (i) { cascadaIsla(i.id, v); });
+        }
+      }),
+
+      checklist({
+        titulo: 'Municipio',
+        buscador: true,
+        items: municipiosVisibles.map(function (m) {
+          var mesas = Number(estado.mesas[m.codigo]) || 0;
+          return {
+            id: m.codigo,
+            nombre: m.nombre,
+            meta: mesas ? mesas + ' mesas' : '—'
+          };
+        }),
+        seleccion: f.municipios,
+        alCambiar: function (id, activo) { alterna(f.municipios, id, activo); },
+        alTodos: function (v) {
+          municipiosVisibles.forEach(function (m) { alterna(f.municipios, m.codigo, v); });
+        }
+      }),
+
+      checklist({
+        titulo: 'Colaboradores',
+        items: App.store.COLABORADORES.map(function (c) {
+          return { id: c.id, nombre: c.nombre, meta: c.agregable ? null : 'aparte' };
+        }),
+        seleccion: f.tipos,
+        corta: true,
+        alCambiar: function (id, activo) { alterna(f.tipos, id, activo); },
+        alTodos: function (v) {
+          App.store.COLABORADORES.forEach(function (c) { alterna(f.tipos, c.id, v); });
+        }
+      }),
+
+      el('label', { class: 'opcion-check', style: 'border:1px solid var(--outline);border-radius:4px' }, [
+        el('input', {
+          type: 'checkbox',
+          checked: f.soloActivos,
+          onChange: function (e) { f.soloActivos = e.target.checked; App.render(); }
+        }),
+        el('span', { class: 'texto', text: 'Sólo municipios con mesas' })
+      ])
+    ]);
+  }
+
+  /* ---------- Indicadores ---------- */
+
+  function kpis(informe) {
+    var costeMesa = informe.totalMesas ? informe.totalTerritorial / informe.totalMesas : 0;
+
+    function tarjeta(etiqueta, valor, nota, destacado) {
+      return el('div', { class: 'tarjeta kpi' }, [
+        el('span', { class: 'etiqueta', text: etiqueta }),
+        el('span', { class: 'valor num' + (destacado ? ' destacado' : ''), text: valor }),
+        el('span', { class: 'nota', text: nota })
+      ]);
+    }
+
+    return el('div', { class: 'rejilla cuatro' }, [
+      tarjeta('Coste total', App.ui.euroCorto(informe.total),
+        informe.incluyeCoordinadores
+          ? 'Incluye ' + euro(informe.coordinadores.total) + ' de coordinadores'
+          : 'Coordinadores no incluidos en la selección',
+        true),
+      tarjeta('Mesas electorales', numero(informe.totalMesas),
+        informe.totalMesas ? euro(costeMesa) + ' por mesa' : 'Sin mesas cargadas'),
+      tarjeta('Municipios', numero(informe.porMunicipio.length),
+        'de ' + numero(App.geo.MUNICIPIOS.length) + ' en Canarias'),
+      tarjeta('Tipologías', numero(informe.tipos.length),
+        'de ' + App.store.COLABORADORES.length + ' colaboradores')
+    ]);
+  }
+
+  /* ---------- Gráficas ---------- */
+
+  function graficas(informe) {
+    var porTipo = App.store.COLABORADORES
+      .filter(function (c) { return c.agregable && informe.tipos.indexOf(c.id) >= 0; })
+      .map(function (c) {
+        return { etiqueta: c.nombre, valor: informe.totalPorTipo[c.id] };
+      });
+
+    var porProvincia = informe.porProvincia.map(function (p) {
+      return { etiqueta: p.nombre, valor: p.importe };
+    });
+
+    var porIsla = informe.porIsla.map(function (i) {
+      return { etiqueta: i.nombre, valor: i.importe };
+    });
+
+    return el('div', { class: 'rejilla principal-lateral' }, [
+      el('section', { class: 'tarjeta' }, [
+        el('header', {}, [
+          el('h2', { text: 'Gasto por tipo de colaborador' }),
+          el('span', { class: 'silencio', text: 'Total repartible: ' + euro(informe.totalTerritorial) })
+        ]),
+        App.ui.barras(porTipo),
+        informe.incluyeCoordinadores && informe.coordinadores.total > 0
+          ? el('p', {
+              class: 'leyenda-nota',
+              text: 'Los coordinadores de tablets (' + euro(informe.coordinadores.total) +
+                ') no aparecen en esta gráfica porque no se reparten por territorio. ' +
+                'Sí están incluidos en el coste total.'
+            })
+          : null
+      ]),
+      el('div', { class: 'apilar', style: 'gap:24px' }, [
+        el('section', { class: 'tarjeta' }, [
+          el('header', {}, [el('h2', { text: 'Por provincia' })]),
+          App.ui.barras(porProvincia, { compacta: true })
+        ]),
+        el('section', { class: 'tarjeta' }, [
+          el('header', {}, [el('h2', { text: 'Por isla' })]),
+          App.ui.barras(porIsla, { compacta: true })
+        ])
+      ])
+    ]);
+  }
+
+  /* ---------- Tablas ---------- */
+
+  var PESTANAS = [
+    { id: 'municipio', nombre: 'Por municipio' },
+    { id: 'isla', nombre: 'Por isla' },
+    { id: 'provincia', nombre: 'Por provincia' },
+    { id: 'colaborador', nombre: 'Por colaborador' },
+    { id: 'detalle', nombre: 'Detalle línea a línea' }
+  ];
+
+  /* Cada constructor devuelve { columnas, filas, totales } en un formato común,
+     de modo que el pintado y la exportación a CSV se escriben una sola vez. */
+  function datosTabla(informe, pestana, termino) {
+    var tiposAgregables = App.store.COLABORADORES.filter(function (c) {
+      return c.agregable && informe.tipos.indexOf(c.id) >= 0;
+    });
+
+    function coincide(txt) {
+      if (!termino) { return true; }
+      return App.geo.normaliza(txt).indexOf(termino) >= 0;
+    }
+
+    if (pestana === 'municipio') {
+      var columnas = [
+        { clave: 'codigo', nombre: 'Código' },
+        { clave: 'nombre', nombre: 'Municipio' },
+        { clave: 'isla', nombre: 'Isla' },
+        { clave: 'mesas', nombre: 'Mesas', num: true }
+      ].concat(tiposAgregables.map(function (c) {
+        return { clave: c.id, nombre: c.nombre, num: true, dinero: true };
+      })).concat([{ clave: 'subtotal', nombre: 'Subtotal', num: true, dinero: true, fuerte: true }]);
+
+      var filas = informe.porMunicipio
+        .filter(function (m) { return coincide(m.nombre + ' ' + m.codigo); })
+        .sort(function (a, b) { return b.subtotal - a.subtotal; })
+        .map(function (m) {
+          var fila = {
+            codigo: m.codigo, nombre: m.nombre, isla: m.islaNombre,
+            mesas: m.mesas, subtotal: m.subtotal
+          };
+          tiposAgregables.forEach(function (c) {
+            fila[c.id] = m.lineas[c.id] ? m.lineas[c.id].importe : 0;
+          });
+          return fila;
+        });
+
+      var totales = { codigo: '', nombre: 'Total', isla: '', mesas: 0, subtotal: 0 };
+      tiposAgregables.forEach(function (c) { totales[c.id] = 0; });
+      filas.forEach(function (f) {
+        totales.mesas += f.mesas;
+        totales.subtotal += f.subtotal;
+        tiposAgregables.forEach(function (c) { totales[c.id] += f[c.id]; });
+      });
+      return { columnas: columnas, filas: filas, totales: totales };
+    }
+
+    if (pestana === 'isla' || pestana === 'provincia') {
+      var origen = pestana === 'isla' ? informe.porIsla : informe.porProvincia;
+      var lista = origen.filter(function (g) { return coincide(g.nombre); });
+      return {
+        columnas: [
+          { clave: 'nombre', nombre: pestana === 'isla' ? 'Isla' : 'Provincia' },
+          { clave: 'municipios', nombre: 'Municipios', num: true },
+          { clave: 'mesas', nombre: 'Mesas', num: true },
+          { clave: 'importe', nombre: 'Importe', num: true, dinero: true, fuerte: true },
+          { clave: 'peso', nombre: '% del total', num: true }
+        ],
+        filas: lista.map(function (g) {
+          return {
+            nombre: g.nombre, municipios: g.municipios, mesas: g.mesas, importe: g.importe,
+            peso: App.ui.porcentaje(g.importe, informe.totalTerritorial)
+          };
+        }),
+        totales: {
+          nombre: 'Total',
+          municipios: lista.reduce(function (a, g) { return a + g.municipios; }, 0),
+          mesas: lista.reduce(function (a, g) { return a + g.mesas; }, 0),
+          importe: lista.reduce(function (a, g) { return a + g.importe; }, 0),
+          peso: ''
+        }
+      };
+    }
+
+    if (pestana === 'colaborador') {
+      var filasC = App.store.COLABORADORES
+        .filter(function (c) { return informe.tipos.indexOf(c.id) >= 0; })
+        .filter(function (c) { return coincide(c.nombre); })
+        .map(function (c) {
+          if (!c.agregable) {
+            return {
+              nombre: c.nombre,
+              cantidad: informe.coordinadores.hasta10.cantidad + informe.coordinadores.desde11.cantidad,
+              unidad: 'coordinadores',
+              importe: informe.coordinadores.total,
+              ambito: 'Global (no territorializado)'
+            };
+          }
+          var unidad = '';
+          informe.porMunicipio.some(function (m) {
+            if (m.lineas[c.id]) { unidad = m.lineas[c.id].unidad; return true; }
+            return false;
+          });
+          return {
+            nombre: c.nombre,
+            cantidad: informe.cantidadPorTipo[c.id],
+            unidad: unidad,
+            importe: informe.totalPorTipo[c.id],
+            ambito: 'Reparto territorial'
+          };
+        });
+
+      return {
+        columnas: [
+          { clave: 'nombre', nombre: 'Colaborador' },
+          { clave: 'cantidad', nombre: 'Cantidad', num: true },
+          { clave: 'unidad', nombre: 'Unidad' },
+          { clave: 'ambito', nombre: 'Ámbito' },
+          { clave: 'importe', nombre: 'Importe', num: true, dinero: true, fuerte: true }
+        ],
+        filas: filasC,
+        totales: {
+          nombre: 'Total', cantidad: '', unidad: '', ambito: '',
+          importe: filasC.reduce(function (a, f) { return a + f.importe; }, 0)
+        }
+      };
+    }
+
+    /* detalle: una línea por municipio y tipología, como en el prototipo. */
+    var detalle = [];
+    informe.porMunicipio.forEach(function (m) {
+      if (!coincide(m.nombre + ' ' + m.codigo)) { return; }
+      tiposAgregables.forEach(function (c) {
+        var l = m.lineas[c.id];
+        if (!l || (!l.importe && !l.cantidad)) { return; }
+        detalle.push({
+          municipio: m.nombre,
+          isla: m.islaNombre,
+          colaborador: c.nombre,
+          unitario: l.importeUnitario,
+          cantidad: l.cantidad,
+          unidad: l.unidad,
+          importe: l.importe
+        });
+      });
+    });
+
+    return {
+      columnas: [
+        { clave: 'municipio', nombre: 'Municipio' },
+        { clave: 'isla', nombre: 'Isla' },
+        { clave: 'colaborador', nombre: 'Colaborador' },
+        { clave: 'unitario', nombre: 'Imp. unitario', num: true, dinero: true },
+        { clave: 'cantidad', nombre: 'Cantidad', num: true },
+        { clave: 'unidad', nombre: 'Unidad' },
+        { clave: 'importe', nombre: 'Subtotal', num: true, dinero: true, fuerte: true }
+      ],
+      filas: detalle,
+      totales: {
+        municipio: 'Total', isla: '', colaborador: '', unitario: '', cantidad: '', unidad: '',
+        importe: detalle.reduce(function (a, f) { return a + f.importe; }, 0)
+      }
+    };
+  }
+
+  function formatearCelda(col, valor) {
+    if (valor === '' || valor == null) { return ''; }
+    if (col.dinero) { return euro(valor); }
+    if (col.num && typeof valor === 'number') { return numero(valor); }
+    return String(valor);
+  }
+
+  function tablaInforme(informe) {
+    var f = estadoFiltros();
+    var termino = App.geo.normaliza(f.busquedaTabla);
+    var datos = datosTabla(informe, f.pestana, termino);
+
+    var cuerpo = el('tbody');
+    datos.filas.forEach(function (fila) {
+      cuerpo.appendChild(el('tr', {}, datos.columnas.map(function (col) {
+        return el('td', {
+          class: col.num ? 'n' : null,
+          style: col.fuerte ? 'font-weight:600' : null,
+          text: formatearCelda(col, fila[col.clave])
+        });
+      })));
+    });
+
+    var tabla = el('table', {}, [
+      el('thead', {}, [
+        el('tr', {}, datos.columnas.map(function (col) {
+          return el('th', { class: col.num ? 'n' : null, text: col.nombre });
+        }))
+      ]),
+      cuerpo,
+      el('tfoot', {}, [
+        el('tr', {}, datos.columnas.map(function (col) {
+          return el('td', {
+            class: col.num ? 'n' : null,
+            text: formatearCelda(col, datos.totales[col.clave])
+          });
+        }))
+      ])
+    ]);
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', { text: 'Desglose del informe' }),
+        el('div', { class: 'fila no-imprimir' }, [
+          el('input', {
+            type: 'search',
+            id: 'buscador-tabla',
+            placeholder: 'Filtrar…',
+            value: f.busquedaTabla,
+            style: 'width:180px',
+            onInput: function (e) {
+              f.busquedaTabla = e.target.value;
+              App.render({ foco: 'buscador-tabla' });
+            }
+          }),
+          el('button', {
+            class: 'btn secundario pequeno',
+            onClick: function () {
+              var filas = [datos.columnas.map(function (c) { return c.nombre; })];
+              datos.filas.forEach(function (fila) {
+                filas.push(datos.columnas.map(function (c) {
+                  var v = fila[c.clave];
+                  return typeof v === 'number' ? String(v).replace('.', ',') : (v == null ? '' : v);
+                }));
+              });
+              App.ui.descargar('informe-' + f.pestana + '.csv', App.ui.aCSV(filas));
+              App.ui.flotante('CSV descargado');
+            }
+          }, [icono('descarga', 14), 'CSV'])
+        ])
+      ]),
+      el('div', { class: 'pestanas no-imprimir', role: 'tablist', style: 'margin-bottom:16px' },
+        PESTANAS.map(function (p) {
+          return el('button', {
+            role: 'tab',
+            'aria-selected': String(f.pestana === p.id),
+            onClick: function () { f.pestana = p.id; App.render(); }
+          }, p.nombre);
+        })
+      ),
+      datos.filas.length
+        ? el('div', { class: 'tabla-scroll alta' }, [tabla])
+        : el('p', { class: 'sin-datos', text: 'No hay líneas que mostrar con los filtros actuales.' })
+    ]);
+  }
+
+  /* ---------- Coordinadores, siempre aparte ---------- */
+
+  function tarjetaCoordinadores(informe) {
+    if (!informe.incluyeCoordinadores) { return null; }
+    var c = informe.coordinadores;
+
+    function linea(nombre, dato) {
+      return el('tr', {}, [
+        el('td', { text: nombre }),
+        el('td', { class: 'n', text: numero(dato.cantidad) }),
+        el('td', { class: 'n', text: euro(dato.importeUnitario) }),
+        el('td', { class: 'n', style: 'font-weight:600', text: euro(dato.importe) })
+      ]);
+    }
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('tableta'), 'Coordinadores de tablets']),
+        el('span', { class: 'chip aviso', text: 'Importe independiente' })
+      ]),
+      el('p', {
+        class: 'silencio',
+        text: 'No se reparte por municipio, isla ni provincia. Se suma únicamente al coste total del informe.'
+      }),
+      el('div', { class: 'tabla-scroll', style: 'margin-top:16px' }, [
+        el('table', {}, [
+          el('thead', {}, [
+            el('tr', {}, [
+              el('th', { text: 'Tramo de colegio' }),
+              el('th', { class: 'n', text: 'Coordinadores' }),
+              el('th', { class: 'n', text: 'Imp. unitario' }),
+              el('th', { class: 'n', text: 'Importe' })
+            ])
+          ]),
+          el('tbody', {}, [
+            linea('Colegios de hasta 10 mesas', c.hasta10),
+            linea('Colegios de 11 mesas o más', c.desde11)
+          ]),
+          el('tfoot', {}, [
+            el('tr', {}, [
+              el('td', { text: 'Total' }),
+              el('td', { class: 'n', text: numero(c.hasta10.cantidad + c.desde11.cantidad) }),
+              el('td', {}),
+              el('td', { class: 'n', text: euro(c.total) })
+            ])
+          ])
+        ])
+      ])
+    ]);
+  }
+
+  /* ---------- Cabecera del informe y exportación ---------- */
+
+  function resumenAmbito(informe) {
+    var f = estadoFiltros();
+    var partes = [];
+
+    var todasProv = f.provincias.length === App.geo.PROVINCIAS.length;
+    partes.push(todasProv
+      ? 'Todas las provincias'
+      : f.provincias.map(function (id) { return App.geo.provincia(id).nombre; }).join(', ') || 'Ninguna provincia');
+
+    var islasEnAmbito = App.geo.ISLAS.filter(function (i) { return f.provincias.indexOf(i.provincia) >= 0; });
+    var islasSel = islasEnAmbito.filter(function (i) { return f.islas.indexOf(i.id) >= 0; });
+    partes.push(islasSel.length === islasEnAmbito.length
+      ? 'todas las islas'
+      : islasSel.map(function (i) { return i.nombre; }).join(', ') || 'ninguna isla');
+
+    partes.push(numero(informe.porMunicipio.length) + ' municipios');
+    partes.push(numero(informe.tipos.length) + ' de ' + App.store.COLABORADORES.length + ' tipologías');
+    if (f.soloActivos) { partes.push('sólo municipios con mesas'); }
+
+    return partes.join(' · ');
+  }
+
+  /* Construye el informe como documento suelto, con el mismo aspecto que tendría
+     impreso. Hace falta porque dentro de un iframe con sandbox el navegador
+     ignora window.print(): allí se abre en una pestaña propia, donde el usuario
+     ya puede imprimir o guardar como PDF con normalidad. */
+  function documentoImprimible() {
+    var estilos = '';
+    document.querySelectorAll('style').forEach(function (s) { estilos += s.textContent; });
+
+    var copia = document.querySelector('.contenido').cloneNode(true);
+    copia.querySelectorAll('.no-imprimir').forEach(function (n) { n.remove(); });
+    copia.querySelectorAll('.tabla-scroll').forEach(function (n) {
+      n.classList.remove('alta');
+      n.style.maxHeight = 'none';
+      n.style.overflow = 'visible';
+    });
+
+    return '<!doctype html><html lang="es"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+      '<title>' + (App.store.estado().convocatoria || 'Informe de gastos') + '</title>' +
+      '<style>' + estilos +
+      /* En el documento suelto lo de impresión se ve también en pantalla. */
+      '.solo-impresion{display:block !important}' +
+      'body{background:#fff;padding:24px}' +
+      '.contenido{max-width:none;padding:0}' +
+      '</style></head><body>' + copia.outerHTML + '</body></html>';
+  }
+
+  function exportarPDF() {
+    if (!App.ui.enMarco()) {
+      window.print();
+      return;
+    }
+
+    /* Vista previa dentro de un marco: se abre el informe aparte. */
+    var blob = new Blob([documentoImprimible()], { type: 'text/html;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var ventana = window.open(url, '_blank');
+
+    if (ventana) {
+      App.ui.flotante('Informe abierto en una pestaña nueva. Use Imprimir → Guardar como PDF.');
+      setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      return;
+    }
+
+    /* Sin permiso para abrir pestañas, queda descargarlo. */
+    URL.revokeObjectURL(url);
+    App.ui.descargar(
+      'informe-' + new Date().toISOString().slice(0, 10) + '.html',
+      documentoImprimible(),
+      'text/html'
+    );
+    App.ui.flotante('Informe descargado en HTML. Ábralo y use Imprimir → Guardar como PDF.');
+  }
+
+  function cabeceraInforme(informe) {
+    var estado = App.store.estado();
+
+    return el('div', {}, [
+      /* Cabecera visible sólo al imprimir o exportar a PDF. */
+      el('div', { class: 'solo-impresion cabecera-impresion' }, [
+        el('h1', { text: 'Informe de gastos — ' + estado.convocatoria }),
+        el('p', { class: 'meta', text: 'Generado el ' + App.ui.fecha(informe.generadoEn) }),
+        el('p', { class: 'meta', text: 'Ámbito: ' + resumenAmbito(informe) })
+      ]),
+
+      el('div', { class: 'entre no-imprimir', style: 'margin-bottom:24px' }, [
+        el('div', {}, [
+          el('h1', { text: 'Informe general de gastos' }),
+          el('p', {
+            style: 'color:var(--on-surface-variant);margin-top:6px',
+            text: estado.convocatoria + ' · Generado el ' + App.ui.fecha(informe.generadoEn)
+          }),
+          el('p', { class: 'silencio', style: 'margin-top:4px', text: resumenAmbito(informe) })
+        ]),
+        el('div', { class: 'fila' }, [
+          el('button', {
+            class: 'btn',
+            onClick: exportarPDF
+          }, [icono('imprimir', 16), 'Exportar a PDF'])
+        ])
+      ])
+    ]);
+  }
+
+  function sinDatos() {
+    return el('section', { class: 'tarjeta' }, [
+      el('div', { class: 'aviso' }, [
+        icono('aviso'),
+        el('div', {}, [
+          el('strong', { text: 'Todavía no hay mesas cargadas. ' }),
+          'El número de mesas por municipio es la base de casi todos los cálculos. ' +
+          'Vaya a «Carga de Datos», descargue la plantilla CSV con los 88 municipios y súbala rellena.'
+        ])
+      ]),
+      el('div', { class: 'fila', style: 'margin-top:18px' }, [
+        el('button', {
+          class: 'btn',
+          onClick: function () { App.irA('datos'); }
+        }, [icono('carga', 16), 'Ir a Carga de Datos'])
+      ])
+    ]);
+  }
+
+  App.vistas = App.vistas || {};
+  App.vistas.dashboard = {
+    titulo: 'Dashboard de Informes',
+    panelLateral: panelFiltros,
+    render: function () {
+      var estado = App.store.estado();
+      var f = estadoFiltros();
+      var hayMesas = Object.keys(estado.mesas).some(function (k) { return estado.mesas[k] > 0; });
+
+      var informe = App.calc.generarInforme(estado, {
+        provincias: f.provincias,
+        islas: f.islas,
+        municipios: f.municipios,
+        soloActivos: f.soloActivos
+      }, f.tipos);
+
+      App.ultimoInforme = informe;
+
+      return el('div', { class: 'apilar', style: 'gap:24px' }, [
+        cabeceraInforme(informe),
+        hayMesas ? null : sinDatos(),
+        kpis(informe),
+        graficas(informe),
+        tarjetaCoordinadores(informe),
+        tablaInforme(informe)
+      ]);
+    }
+  };
+})(window.App = window.App || {});
+
+/* ===== 90-app.js ===== */
+/* Armazón de la aplicación: navegación, pintado y arranque. */
+(function (App) {
+  'use strict';
+
+  var el = App.ui.el;
+  var icono = App.ui.icono;
+
+  var VISTAS = [
+    { id: 'dashboard', nombre: 'Dashboard de Informes', icono: 'dashboard' },
+    { id: 'configuracion', nombre: 'Configuración de Importes', icono: 'ajustes' },
+    { id: 'datos', nombre: 'Carga de Datos', icono: 'carga' }
+  ];
+
+  var actual = 'dashboard';
+  var menuAbierto = false;
+
+  function barraSuperior() {
+    return el('header', { class: 'topbar no-imprimir' }, [
+      el('button', {
+        class: 'btn fantasma pequeno',
+        'aria-label': 'Abrir menú de navegación',
+        'aria-expanded': String(menuAbierto),
+        onClick: function () { menuAbierto = !menuAbierto; App.render(); }
+      }, [icono('menu', 20)]),
+      el('strong', { text: 'Elecciones Canarias' })
+    ]);
+  }
+
+  function barraLateral() {
+    return el('nav', { class: 'sidebar no-imprimir', 'aria-label': 'Navegación principal' }, [
+      el('div', {}, [
+        el('div', { class: 'marca-titulo', text: 'Gestión Electoral' }),
+        el('div', { class: 'marca-sub', text: 'Administración de gastos' })
+      ]),
+      el('div', { class: 'nav' }, VISTAS.map(function (v) {
+        return el('button', {
+          'aria-current': actual === v.id ? 'page' : null,
+          onClick: function () { App.irA(v.id); }
+        }, [icono(v.icono), v.nombre]);
+      })),
+      el('div', { style: 'margin-top:auto' }, [
+        el('p', { class: 'silencio', text: 'Datos guardados en este navegador' })
+      ])
+    ]);
+  }
+
+  function pie() {
+    return el('footer', { class: 'pie no-imprimir' }, [
+      el('span', { text: 'Sistema de gestión de colaboradores electorales — Canarias' }),
+      el('span', { text: App.geo.MUNICIPIOS.length + ' municipios · 7 islas · 2 provincias' })
+    ]);
+  }
+
+  /* render({ foco }) reconstruye la vista actual. `foco` reinstala el cursor en
+     un campo tras el repintado, para que escribir en un buscador no lo pierda. */
+  App.render = function (opciones) {
+    opciones = opciones || {};
+    var vista = App.vistas[actual];
+    var raiz = document.getElementById('app');
+
+    var seleccion = null;
+    if (opciones.foco) {
+      var previo = document.getElementById(opciones.foco);
+      if (previo) { seleccion = previo.selectionStart; }
+    }
+
+    App.ui.vaciar(raiz);
+    raiz.className = 'app' + (menuAbierto ? ' menu-abierto' : '');
+
+    var contenido = el('div', { class: 'contenido' }, [
+      vista.titulo && actual !== 'dashboard'
+        ? el('div', { class: 'cabecera-pagina no-imprimir' }, [
+            el('h1', { text: vista.titulo }),
+            vista.subtitulo ? el('p', { text: vista.subtitulo }) : null
+          ])
+        : null,
+      vista.render()
+    ]);
+
+    raiz.appendChild(barraLateral());
+    if (menuAbierto) {
+      raiz.appendChild(el('div', {
+        class: 'velo no-imprimir',
+        onClick: function () { menuAbierto = false; App.render(); }
+      }));
+    }
+    if (vista.panelLateral) { raiz.appendChild(vista.panelLateral()); }
+    raiz.appendChild(el('div', { class: 'principal' }, [contenido, pie()]));
+
+    /* La barra superior sólo existe en pantallas estrechas; se inserta al
+       principio para que quede pegada arriba. */
+    raiz.insertBefore(barraSuperior(), raiz.firstChild);
+
+    if (opciones.foco) {
+      var campo = document.getElementById(opciones.foco);
+      if (campo) {
+        campo.focus();
+        if (seleccion != null && campo.setSelectionRange) {
+          try { campo.setSelectionRange(seleccion, seleccion); } catch (e) { /* tipos sin selección */ }
+        }
+      }
+    }
+  };
+
+  App.irA = function (id) {
+    actual = id;
+    menuAbierto = false;
+    App.render();
+    window.scrollTo(0, 0);
+  };
+
+  App.iniciar = function () {
+    App.store.init();
+    App.render();
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', App.iniciar);
+  } else {
+    App.iniciar();
+  }
+})(window.App = window.App || {});
+
+</script>
+</body>
+</html>
