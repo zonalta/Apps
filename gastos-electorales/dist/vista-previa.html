@@ -825,6 +825,27 @@ tfoot td {
       'provincia de santa cruz de tenerife']
   };
 
+  /* Clave de orden alfabético: "Oliva, La" y "La Oliva" deben alfabetizarse
+     por "Oliva", no por el artículo. */
+  function claveOrden(nombre) {
+    var base = String(nombre || '');
+    var conComa = /^(.*), (La|El|Los|Las)$/.exec(base);
+    if (conComa) { return conComa[1]; }
+    var conArticulo = /^(La|El|Los|Las) (.*)$/.exec(base);
+    if (conArticulo) { return conArticulo[2]; }
+    return base;
+  }
+
+  /* Copia ordenada alfabéticamente (por nombre, ignorando el artículo) de
+     cualquier lista de islas o municipios. No toca el orden original, que se
+     conserva por si algo depende de él (ninguna parte del cálculo lo hace,
+     pero el orden de origen sigue siendo el del código INE). */
+  function ordenarPorNombre(lista) {
+    return lista.slice().sort(function (a, b) {
+      return normaliza(claveOrden(a.nombre)).localeCompare(normaliza(claveOrden(b.nombre)), 'es');
+    });
+  }
+
   /* Devuelve '35', '38' o null si el texto no identifica ninguna provincia. */
   function provinciaDeTexto(valor) {
     var norm = normaliza(valor);
@@ -878,7 +899,8 @@ tfoot td {
     normaliza: normaliza,
     resolverMunicipio: resolverMunicipio,
     discrepancia: discrepancia,
-    provinciaDeTexto: provinciaDeTexto
+    provinciaDeTexto: provinciaDeTexto,
+    ordenarPorNombre: ordenarPorNombre
   };
 })(window.App = window.App || {});
 
@@ -1913,7 +1935,7 @@ tfoot td {
   /* Aplica los filtros del informe y devuelve los códigos de municipio en ámbito.
      filtros = { provincias: [], islas: [], municipios: [], soloActivos: bool } */
   function municipiosEnAmbito(estado, filtros) {
-    return App.geo.MUNICIPIOS.filter(function (m) {
+    return App.geo.ordenarPorNombre(App.geo.MUNICIPIOS).filter(function (m) {
       if (filtros.provincias && filtros.provincias.length &&
           filtros.provincias.indexOf(m.provincia) < 0) { return false; }
       if (filtros.islas && filtros.islas.length &&
@@ -3029,7 +3051,7 @@ tfoot td {
 
   function tablaEstadoDatos() {
     var estado = App.store.estado();
-    var filas = App.geo.MUNICIPIOS.map(function (m) {
+    var filas = App.geo.ordenarPorNombre(App.geo.MUNICIPIOS).map(function (m) {
       var reps = estado.representantes[m.codigo] || {};
       var totalReps = App.store.TIPOLOGIAS_PD.reduce(function (a, t) {
         return a + (Number(reps[t]) || 0);
@@ -3280,7 +3302,10 @@ tfoot td {
       soloActivos: true,
       busquedaMunicipio: '',
       busquedaTabla: '',
-      pestana: 'municipio'
+      pestana: 'municipio',
+      /* Orden de la tabla de desglose, por pestaña: { columna, direccion }.
+         Sin entrada para una pestaña se usa su orden por defecto. */
+      orden: {}
     };
   }
 
@@ -3365,18 +3390,18 @@ tfoot td {
     var f = estadoFiltros();
     var estado = App.store.estado();
 
-    var islasVisibles = App.geo.ISLAS.filter(function (i) {
+    var islasVisibles = App.geo.ordenarPorNombre(App.geo.ISLAS.filter(function (i) {
       return f.provincias.indexOf(i.provincia) >= 0;
-    });
+    }));
 
     var termino = App.geo.normaliza(f.busquedaMunicipio);
-    var municipiosVisibles = App.geo.MUNICIPIOS.filter(function (m) {
+    var municipiosVisibles = App.geo.ordenarPorNombre(App.geo.MUNICIPIOS.filter(function (m) {
       if (f.islas.indexOf(m.isla) < 0) { return false; }
       if (f.provincias.indexOf(m.provincia) < 0) { return false; }
       if (termino && App.geo.normaliza(m.nombre).indexOf(termino) < 0 &&
           m.codigo.indexOf(termino) < 0) { return false; }
       return true;
-    });
+    }));
 
     /* Al desmarcar un ámbito superior se arrastra lo que cuelga de él, para que
        los contadores del panel no mientan. */
@@ -3717,10 +3742,36 @@ tfoot td {
     return String(valor);
   }
 
+  /* Al pulsar una cabecera se ordena por esa columna; al volver a pulsar la
+     misma se invierte el sentido. Cada pestaña recuerda su propio orden, y sin
+     elegir ninguno se mantiene el orden por defecto de datosTabla. */
+  function alternarOrden(f, clave, esNumero) {
+    var actual = f.orden[f.pestana];
+    if (actual && actual.clave === clave) {
+      f.orden[f.pestana] = { clave: clave, direccion: actual.direccion === 'asc' ? 'desc' : 'asc' };
+    } else {
+      f.orden[f.pestana] = { clave: clave, direccion: esNumero ? 'desc' : 'asc' };
+    }
+  }
+
+  function ordenarFilas(filas, columnas, ordenActivo) {
+    if (!ordenActivo) { return filas; }
+    var col = columnas.filter(function (c) { return c.clave === ordenActivo.clave; })[0];
+    var dir = ordenActivo.direccion === 'asc' ? 1 : -1;
+    return filas.slice().sort(function (a, b) {
+      var va = a[ordenActivo.clave];
+      var vb = b[ordenActivo.clave];
+      if (col && col.num) { return ((Number(va) || 0) - (Number(vb) || 0)) * dir; }
+      return String(va == null ? '' : va).localeCompare(String(vb == null ? '' : vb), 'es') * dir;
+    });
+  }
+
   function tablaInforme(informe) {
     var f = estadoFiltros();
     var termino = App.geo.normaliza(f.busquedaTabla);
     var datos = datosTabla(informe, f.pestana, termino);
+    var ordenActivo = f.orden[f.pestana];
+    datos.filas = ordenarFilas(datos.filas, datos.columnas, ordenActivo);
 
     var cuerpo = el('tbody');
     datos.filas.forEach(function (fila) {
@@ -3736,7 +3787,16 @@ tfoot td {
     var tabla = el('table', {}, [
       el('thead', {}, [
         el('tr', {}, datos.columnas.map(function (col) {
-          return el('th', { class: col.num ? 'n' : null, text: col.nombre });
+          var activa = ordenActivo && ordenActivo.clave === col.clave;
+          return el('th', {
+            class: col.num ? 'n' : null,
+            title: 'Ordenar por ' + col.nombre,
+            style: 'cursor:pointer;user-select:none',
+            onClick: function () { alternarOrden(f, col.clave, col.num); App.render(); }
+          }, [
+            col.nombre,
+            activa ? el('span', { style: 'margin-left:4px', text: ordenActivo.direccion === 'asc' ? '▲' : '▼' }) : null
+          ]);
         }))
       ]),
       cuerpo,

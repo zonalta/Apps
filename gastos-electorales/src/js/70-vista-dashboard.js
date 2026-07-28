@@ -20,7 +20,10 @@
       soloActivos: true,
       busquedaMunicipio: '',
       busquedaTabla: '',
-      pestana: 'municipio'
+      pestana: 'municipio',
+      /* Orden de la tabla de desglose, por pestaña: { columna, direccion }.
+         Sin entrada para una pestaña se usa su orden por defecto. */
+      orden: {}
     };
   }
 
@@ -105,18 +108,18 @@
     var f = estadoFiltros();
     var estado = App.store.estado();
 
-    var islasVisibles = App.geo.ISLAS.filter(function (i) {
+    var islasVisibles = App.geo.ordenarPorNombre(App.geo.ISLAS.filter(function (i) {
       return f.provincias.indexOf(i.provincia) >= 0;
-    });
+    }));
 
     var termino = App.geo.normaliza(f.busquedaMunicipio);
-    var municipiosVisibles = App.geo.MUNICIPIOS.filter(function (m) {
+    var municipiosVisibles = App.geo.ordenarPorNombre(App.geo.MUNICIPIOS.filter(function (m) {
       if (f.islas.indexOf(m.isla) < 0) { return false; }
       if (f.provincias.indexOf(m.provincia) < 0) { return false; }
       if (termino && App.geo.normaliza(m.nombre).indexOf(termino) < 0 &&
           m.codigo.indexOf(termino) < 0) { return false; }
       return true;
-    });
+    }));
 
     /* Al desmarcar un ámbito superior se arrastra lo que cuelga de él, para que
        los contadores del panel no mientan. */
@@ -457,10 +460,36 @@
     return String(valor);
   }
 
+  /* Al pulsar una cabecera se ordena por esa columna; al volver a pulsar la
+     misma se invierte el sentido. Cada pestaña recuerda su propio orden, y sin
+     elegir ninguno se mantiene el orden por defecto de datosTabla. */
+  function alternarOrden(f, clave, esNumero) {
+    var actual = f.orden[f.pestana];
+    if (actual && actual.clave === clave) {
+      f.orden[f.pestana] = { clave: clave, direccion: actual.direccion === 'asc' ? 'desc' : 'asc' };
+    } else {
+      f.orden[f.pestana] = { clave: clave, direccion: esNumero ? 'desc' : 'asc' };
+    }
+  }
+
+  function ordenarFilas(filas, columnas, ordenActivo) {
+    if (!ordenActivo) { return filas; }
+    var col = columnas.filter(function (c) { return c.clave === ordenActivo.clave; })[0];
+    var dir = ordenActivo.direccion === 'asc' ? 1 : -1;
+    return filas.slice().sort(function (a, b) {
+      var va = a[ordenActivo.clave];
+      var vb = b[ordenActivo.clave];
+      if (col && col.num) { return ((Number(va) || 0) - (Number(vb) || 0)) * dir; }
+      return String(va == null ? '' : va).localeCompare(String(vb == null ? '' : vb), 'es') * dir;
+    });
+  }
+
   function tablaInforme(informe) {
     var f = estadoFiltros();
     var termino = App.geo.normaliza(f.busquedaTabla);
     var datos = datosTabla(informe, f.pestana, termino);
+    var ordenActivo = f.orden[f.pestana];
+    datos.filas = ordenarFilas(datos.filas, datos.columnas, ordenActivo);
 
     var cuerpo = el('tbody');
     datos.filas.forEach(function (fila) {
@@ -476,7 +505,16 @@
     var tabla = el('table', {}, [
       el('thead', {}, [
         el('tr', {}, datos.columnas.map(function (col) {
-          return el('th', { class: col.num ? 'n' : null, text: col.nombre });
+          var activa = ordenActivo && ordenActivo.clave === col.clave;
+          return el('th', {
+            class: col.num ? 'n' : null,
+            title: 'Ordenar por ' + col.nombre,
+            style: 'cursor:pointer;user-select:none',
+            onClick: function () { alternarOrden(f, col.clave, col.num); App.render(); }
+          }, [
+            col.nombre,
+            activa ? el('span', { style: 'margin-left:4px', text: ordenActivo.direccion === 'asc' ? '▲' : '▼' }) : null
+          ]);
         }))
       ]),
       cuerpo,

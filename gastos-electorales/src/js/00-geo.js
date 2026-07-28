@@ -192,6 +192,27 @@
       'provincia de santa cruz de tenerife']
   };
 
+  /* Clave de orden alfabético: "Oliva, La" y "La Oliva" deben alfabetizarse
+     por "Oliva", no por el artículo. */
+  function claveOrden(nombre) {
+    var base = String(nombre || '');
+    var conComa = /^(.*), (La|El|Los|Las)$/.exec(base);
+    if (conComa) { return conComa[1]; }
+    var conArticulo = /^(La|El|Los|Las) (.*)$/.exec(base);
+    if (conArticulo) { return conArticulo[2]; }
+    return base;
+  }
+
+  /* Copia ordenada alfabéticamente (por nombre, ignorando el artículo) de
+     cualquier lista de islas o municipios. No toca el orden original, que se
+     conserva por si algo depende de él (ninguna parte del cálculo lo hace,
+     pero el orden de origen sigue siendo el del código INE). */
+  function ordenarPorNombre(lista) {
+    return lista.slice().sort(function (a, b) {
+      return normaliza(claveOrden(a.nombre)).localeCompare(normaliza(claveOrden(b.nombre)), 'es');
+    });
+  }
+
   /* Devuelve '35', '38' o null si el texto no identifica ninguna provincia. */
   function provinciaDeTexto(valor) {
     var norm = normaliza(valor);
@@ -245,6 +266,7 @@
     normaliza: normaliza,
     resolverMunicipio: resolverMunicipio,
     discrepancia: discrepancia,
-    provinciaDeTexto: provinciaDeTexto
+    provinciaDeTexto: provinciaDeTexto,
+    ordenarPorNombre: ordenarPorNombre
   };
 })(window.App = window.App || {});

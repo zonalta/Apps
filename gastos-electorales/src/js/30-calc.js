@@ -116,7 +116,7 @@
   /* Aplica los filtros del informe y devuelve los códigos de municipio en ámbito.
      filtros = { provincias: [], islas: [], municipios: [], soloActivos: bool } */
   function municipiosEnAmbito(estado, filtros) {
-    return App.geo.MUNICIPIOS.filter(function (m) {
+    return App.geo.ordenarPorNombre(App.geo.MUNICIPIOS).filter(function (m) {
       if (filtros.provincias && filtros.provincias.length &&
           filtros.provincias.indexOf(m.provincia) < 0) { return false; }
       if (filtros.islas && filtros.islas.length &&
