@@ -10,12 +10,17 @@ FROM node:22-alpine
 ENV NODE_ENV=production
 WORKDIR /app
 
-# Cloud Run recomienda no ejecutar como root.
-COPY server.js package.json ./
+# Las dependencias van antes que el código para aprovechar la caché de capas.
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+COPY server.js ./
+COPY servidor ./servidor
 COPY --from=compilacion /app/dist ./dist
+
+# Cloud Run recomienda no ejecutar como root.
 USER node
 
-# Cloud Run inyecta PORT; 8080 es su valor por defecto.
 ENV PORT=8080
 EXPOSE 8080
 CMD ["node", "server.js"]

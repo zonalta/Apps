@@ -560,6 +560,61 @@ tfoot td {
 }
 .lista-rechazos li { margin: 2px 0; font-variant-numeric: tabular-nums; }
 
+/* ---------- Acceso y sesión ---------- */
+
+.acceso {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; padding: 24px;
+  background: var(--background);
+}
+.tarjeta-acceso {
+  width: min(440px, 100%);
+  display: flex; flex-direction: column; gap: 18px;
+  text-align: center; align-items: center;
+  padding: 36px 32px;
+}
+.tarjeta-acceso .marca-titulo { font-size: 26px; }
+.tarjeta-acceso .aviso { text-align: left; }
+.marca-acceso { display: flex; flex-direction: column; gap: 2px; }
+.boton-google { display: flex; justify-content: center; min-height: 44px; }
+
+.pie-lateral {
+  margin-top: auto;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+.estado-sync {
+  padding: 10px 12px;
+  border: 1px solid var(--outline);
+  border-radius: var(--radio);
+  background: var(--surface-low);
+  font-size: 12px;
+}
+.estado-sync .fila { gap: 8px; }
+.estado-sync strong { font-size: 12px; }
+.estado-sync p { margin-top: 4px; line-height: 1.45; }
+.punto-sync {
+  width: 8px; height: 8px; border-radius: 999px;
+  background: var(--muted); flex: 0 0 8px;
+}
+.sync-ok .punto-sync { background: var(--good); }
+.sync-trabajando .punto-sync { background: var(--surface-tint); }
+.sync-error .punto-sync { background: var(--error); }
+.sync-error { border-color: var(--error); background: var(--error-container); }
+.sync-local .punto-sync { background: var(--on-warning-container); }
+.sync-local { background: var(--warning-container); border-color: var(--warning-container); }
+
+.ficha-usuario {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--outline);
+}
+.ficha-usuario .crece { display: flex; flex-direction: column; min-width: 0; }
+.nombre-usuario { font-size: 13px; }
+.ficha-usuario .silencio {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 </style>
 <div id="app" class="app"></div>
 <script>
@@ -815,30 +870,187 @@ tfoot td {
   };
 })(window.App = window.App || {});
 
+/* ===== 05-api.js ===== */
+/* Comunicación con el servidor y sesión de Google.
+   La aplicación funciona en dos modos:
+     - «servidor»: hay API detrás, hace falta iniciar sesión y los datos viven
+       en la base de datos, compartidos entre dispositivos.
+     - «local»: no hay API (fichero abierto directamente, vista previa). Los
+       datos se quedan en este navegador y se avisa de ello.
+   El modo se detecta al arrancar, no se configura. */
+(function (App) {
+  'use strict';
+
+  var GUION_GOOGLE = 'https://accounts.google.com/gsi/client';
+  var CLAVE_CREDENCIAL = 'gastos-electorales:credencial';
+
+  var estado = {
+    modo: null,        // 'servidor' | 'local'
+    clienteId: null,
+    aviso: null,
+    sesion: null,      // { correo, nombre, foto }
+    credencial: null
+  };
+
+  function recordarCredencial(valor) {
+    estado.credencial = valor;
+    try {
+      if (valor) { window.sessionStorage.setItem(CLAVE_CREDENCIAL, valor); }
+      else { window.sessionStorage.removeItem(CLAVE_CREDENCIAL); }
+    } catch (e) { /* sin sessionStorage la sesión dura lo que la pestaña */ }
+  }
+
+  function recuperarCredencial() {
+    try { return window.sessionStorage.getItem(CLAVE_CREDENCIAL); }
+    catch (e) { return null; }
+  }
+
+  function peticion(ruta, opciones) {
+    opciones = opciones || {};
+    var cabeceras = { 'Content-Type': 'application/json' };
+    if (estado.credencial) {
+      cabeceras.Authorization = 'Bearer ' + estado.credencial;
+    }
+    return fetch(ruta, {
+      method: opciones.metodo || 'GET',
+      headers: cabeceras,
+      body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (cuerpo) {
+        if (r.ok) { return cuerpo; }
+        var err = new Error(cuerpo.error || ('Error ' + r.status));
+        err.estado = r.status;
+        err.cuerpo = cuerpo;
+        throw err;
+      });
+    });
+  }
+
+  /* Averigua si hay servidor detrás. Un fallo de red aquí no es un error:
+     significa que la aplicación se está usando suelta. */
+  function detectarModo() {
+    /* Un fichero abierto directamente nunca tiene API detrás, y preguntar por
+       ella sólo ensucia la consola con un error de CORS. */
+    if (window.location.protocol === 'file:') {
+      estado.modo = 'local';
+      return Promise.resolve(estado);
+    }
+
+    return fetch('/api/configuracion', { headers: { Accept: 'application/json' } })
+      .then(function (r) {
+        if (!r.ok) { throw new Error('sin api'); }
+        return r.json();
+      })
+      .then(function (cfg) {
+        estado.modo = 'servidor';
+        estado.clienteId = cfg.clienteId;
+        estado.aviso = cfg.aviso;
+        estado.modoAuth = cfg.modo;
+        estado.configurado = cfg.configurado === true;
+        estado.credencial = recuperarCredencial();
+        return estado;
+      })
+      .catch(function () {
+        estado.modo = 'local';
+        return estado;
+      });
+  }
+
+  /* Carga el script de Google una sola vez. */
+  var promesaGoogle = null;
+  function cargarGoogle() {
+    if (promesaGoogle) { return promesaGoogle; }
+    promesaGoogle = new Promise(function (resolve, reject) {
+      if (window.google && window.google.accounts) { return resolve(); }
+      var s = document.createElement('script');
+      s.src = GUION_GOOGLE;
+      s.async = true;
+      s.defer = true;
+      s.onload = resolve;
+      s.onerror = function () {
+        reject(new Error('No se pudo cargar el acceso de Google. Compruebe la conexión.'));
+      };
+      document.head.appendChild(s);
+    });
+    return promesaGoogle;
+  }
+
+  /* Pinta el botón oficial de Google dentro del contenedor indicado. */
+  function pintarBotonAcceso(contenedor, alEntrar, alFallar) {
+    cargarGoogle().then(function () {
+      window.google.accounts.id.initialize({
+        client_id: estado.clienteId,
+        callback: function (respuesta) {
+          recordarCredencial(respuesta.credential);
+          verificarSesion().then(alEntrar).catch(alFallar);
+        }
+      });
+      window.google.accounts.id.renderButton(contenedor, {
+        theme: 'filled_blue',
+        size: 'large',
+        text: 'signin_with',
+        locale: 'es',
+        width: 280
+      });
+    }).catch(alFallar);
+  }
+
+  function verificarSesion() {
+    return peticion('/api/sesion').then(function (s) {
+      estado.sesion = s;
+      return s;
+    });
+  }
+
+  function cerrarSesion() {
+    recordarCredencial(null);
+    estado.sesion = null;
+    try {
+      if (window.google && window.google.accounts) {
+        window.google.accounts.id.disableAutoSelect();
+      }
+    } catch (e) { /* da igual si Google no está cargado */ }
+  }
+
+  App.api = {
+    estado: function () { return estado; },
+    detectarModo: detectarModo,
+    pintarBotonAcceso: pintarBotonAcceso,
+    verificarSesion: verificarSesion,
+    cerrarSesion: cerrarSesion,
+    leerEstado: function () { return peticion('/api/estado'); },
+    guardarEstado: function (version, datos) {
+      return peticion('/api/estado', { metodo: 'PUT', cuerpo: { version: version, datos: datos } });
+    }
+  };
+})(window.App = window.App || {});
+
 /* ===== 10-state.js ===== */
 /* Estado de la aplicación y su persistencia.
-   En esta fase el almacén es localStorage (por dispositivo). El acceso pasa
-   siempre por App.store, de modo que sustituirlo por una API REST contra el
-   backend en Cloud Run afecta sólo a este fichero. */
+   En modo servidor los datos viven en la base de datos y se comparten entre
+   dispositivos; el navegador guarda una copia que sirve de respaldo si se cae
+   la conexión. En modo local el navegador es el único almacén.
+   La interfaz (estado / muta / suscribir) es la misma en ambos casos, de modo
+   que las vistas no saben de dónde vienen los datos. */
 (function (App) {
   'use strict';
 
   var CLAVE = 'gastos-electorales:v1';
+  var ESPERA_GUARDADO = 800; // ms de calma antes de mandar al servidor
 
   /* Tipologías de colaborador. El orden manda en la UI y en los informes.
      `agregable: false` marca los conceptos que, por decisión de negocio, no se
-     suman al reparto territorial (los coordinadores todavía no cuelgan de un
-     municipio). */
+     suman al reparto territorial. */
   var COLABORADORES = [
-    { id: 'representantes', nombre: 'Representantes de la Administración', base: 'representantes', agregable: true },
-    { id: 'secretarios', nombre: 'Secretarios de Ayuntamiento', base: 'tramo-mesas', agregable: true },
-    { id: 'juecesPaz', nombre: 'Jueces de Paz', base: 'municipio', agregable: true },
-    { id: 'acondicionamiento', nombre: 'Acondicionamiento de locales', base: 'mesas', agregable: true },
-    { id: 'personalColaborador', nombre: 'Personal colaborador', base: 'mesas', agregable: true },
-    { id: 'montajeTransporte', nombre: 'Montaje y transporte', base: 'mesas', agregable: true },
-    { id: 'policia', nombre: 'Policía Autonómica y Local', base: 'efectivos', agregable: true },
-    { id: 'miembrosMesa', nombre: 'Miembros de mesas electorales', base: 'mesas-x3', agregable: true },
-    { id: 'coordinadores', nombre: 'Coordinadores de tablets', base: 'global', agregable: false }
+    { id: 'representantes', nombre: 'Representantes de la Administración', agregable: true },
+    { id: 'secretarios', nombre: 'Secretarios de Ayuntamiento', agregable: true },
+    { id: 'juecesPaz', nombre: 'Jueces de Paz', agregable: true },
+    { id: 'acondicionamiento', nombre: 'Acondicionamiento de locales', agregable: true },
+    { id: 'personalColaborador', nombre: 'Personal colaborador', agregable: true },
+    { id: 'montajeTransporte', nombre: 'Montaje y transporte', agregable: true },
+    { id: 'policia', nombre: 'Policía Autonómica y Local', agregable: true },
+    { id: 'miembrosMesa', nombre: 'Miembros de mesas electorales', agregable: true },
+    { id: 'coordinadores', nombre: 'Coordinadores de tablets', agregable: false }
   ];
 
   var TIPOLOGIAS_PD = ['PD0', 'PD1', 'PD2', 'PD3', 'PD4', 'PD5'];
@@ -856,12 +1068,7 @@ tfoot td {
       /* Miembros por mesa. El briefing fija 3; se deja configurable porque es
          el tipo de constante que cambia entre convocatorias. */
       miembrosPorMesa: 3,
-      coordinadores: {
-        tarifaHasta10: 120,
-        tarifaDesde11: 140,
-        numHasta10: 0,
-        numDesde11: 0
-      }
+      coordinadores: { tarifaHasta10: 120, tarifaDesde11: 140, numHasta10: 0, numDesde11: 0 }
     };
   }
 
@@ -870,17 +1077,15 @@ tfoot td {
       version: 1,
       convocatoria: 'Proceso electoral',
       config: configPorDefecto(),
-      /* Datos cargados por municipio, indexados por código INE. */
       mesas: {},            // codigo -> nº de mesas
       representantes: {},   // codigo -> { PD0: n, ... }
       policia: {},          // codigo -> nº de efectivos
-      cargas: {}            // origen -> { fecha, fichero, filas }
+      cargas: {}            // censo -> { fecha, fichero, filas }
     };
   }
 
-  /* Mezcla superficial y recursiva de los valores guardados sobre los valores por
-     defecto, para que una versión nueva que añada un campo no rompa un estado
-     antiguo. */
+  /* Mezcla lo guardado sobre los valores por defecto, para que una versión que
+     añada un campo nuevo no rompa unos datos antiguos. */
   function fusiona(base, guardado) {
     if (!guardado || typeof guardado !== 'object') { return base; }
     Object.keys(guardado).forEach(function (k) {
@@ -888,7 +1093,7 @@ tfoot td {
       if (v && typeof v === 'object' && !Array.isArray(v) &&
           base[k] && typeof base[k] === 'object' && !Array.isArray(base[k])) {
         fusiona(base[k], v);
-      } else if (v !== undefined) {
+      } else if (v !== undefined && v !== null) {
         base[k] = v;
       }
     });
@@ -898,29 +1103,141 @@ tfoot td {
   var estado = estadoPorDefecto();
   var suscriptores = [];
 
-  function cargar() {
-    var bruto = null;
-    try { bruto = window.localStorage.getItem(CLAVE); } catch (e) { bruto = null; }
-    if (!bruto) { return; }
+  /* Estado de la sincronización, para que la interfaz pueda decir la verdad
+     sobre si lo que se ve está guardado o no. */
+  var sync = {
+    modo: 'local',        // 'servidor' | 'local'
+    situacion: 'inactivo', // inactivo | guardando | guardado | pendiente | error | conflicto
+    version: 0,           // versión del documento en el servidor
+    actualizado: null,
+    actualizadoPor: null,
+    mensaje: null
+  };
+
+  var temporizador = null;
+  var guardadoEnCurso = false;
+  var hayCambiosPendientes = false;
+
+  /* ---------- Copia local, que hace de respaldo ---------- */
+
+  function guardarEnNavegador() {
     try {
-      estado = fusiona(estadoPorDefecto(), JSON.parse(bruto));
-    } catch (e) {
-      console.warn('Estado guardado ilegible, se parte de los valores por defecto', e);
-    }
+      window.localStorage.setItem(CLAVE, JSON.stringify({ datos: estado, version: sync.version }));
+    } catch (e) { /* modo privado o cuota llena: se sigue sin copia */ }
   }
 
-  function guardar() {
+  function leerDelNavegador() {
     try {
-      window.localStorage.setItem(CLAVE, JSON.stringify(estado));
-    } catch (e) {
-      console.warn('No se pudo guardar el estado', e);
-      return false;
-    }
-    return true;
+      var bruto = window.localStorage.getItem(CLAVE);
+      if (!bruto) { return null; }
+      var obj = JSON.parse(bruto);
+      /* Formato antiguo: el estado estaba guardado en la raíz. */
+      return obj && obj.datos ? obj : { datos: obj, version: 0 };
+    } catch (e) { return null; }
   }
 
   function notificar() {
     suscriptores.forEach(function (fn) { fn(estado); });
+  }
+
+  function cambiarSituacion(situacion, mensaje) {
+    sync.situacion = situacion;
+    sync.mensaje = mensaje || null;
+    if (App.render) { App.render(); }
+  }
+
+  /* ---------- Guardado en el servidor ---------- */
+
+  function programarGuardado() {
+    if (sync.modo !== 'servidor') { return; }
+    hayCambiosPendientes = true;
+    sync.situacion = 'pendiente';
+    if (temporizador) { clearTimeout(temporizador); }
+    temporizador = setTimeout(enviar, ESPERA_GUARDADO);
+  }
+
+  function enviar() {
+    if (sync.modo !== 'servidor' || guardadoEnCurso) { return; }
+    if (!hayCambiosPendientes) { return; }
+
+    guardadoEnCurso = true;
+    hayCambiosPendientes = false;
+    cambiarSituacion('guardando');
+
+    var instantanea = JSON.parse(JSON.stringify(estado));
+
+    App.api.guardarEstado(sync.version, instantanea)
+      .then(function (registro) {
+        sync.version = registro.version;
+        sync.actualizado = registro.actualizado;
+        sync.actualizadoPor = registro.actualizadoPor;
+        guardarEnNavegador();
+        guardadoEnCurso = false;
+        /* Si algo cambió mientras se guardaba, se vuelve a mandar. */
+        if (hayCambiosPendientes) { enviar(); }
+        else { cambiarSituacion('guardado'); }
+      })
+      .catch(function (err) {
+        guardadoEnCurso = false;
+
+        if (err.estado === 409) {
+          /* Otro dispositivo guardó antes. No se pisa nada: se avisa y se deja
+             que la persona decida cuál de las dos versiones vale. */
+          sync.situacion = 'conflicto';
+          sync.conflicto = err.cuerpo && err.cuerpo.actual;
+          if (App.resolverConflicto) { App.resolverConflicto(sync.conflicto); }
+          else if (App.render) { App.render(); }
+          return;
+        }
+
+        if (err.estado === 401 || err.estado === 403) {
+          cambiarSituacion('error', 'La sesión ha caducado. Vuelva a entrar para guardar.');
+          if (App.pedirSesion) { App.pedirSesion(); }
+          return;
+        }
+
+        hayCambiosPendientes = true;
+        cambiarSituacion('error', err.message || 'No se pudo guardar. Se reintentará.');
+        setTimeout(enviar, 5000);
+      });
+  }
+
+  /* ---------- Arranque ---------- */
+
+  function aplicarRegistro(registro) {
+    var base = estadoPorDefecto();
+    fusiona(base, registro.datos || {});
+    estado = base;
+    sync.version = registro.version || 0;
+    sync.actualizado = registro.actualizado || null;
+    sync.actualizadoPor = registro.actualizadoPor || null;
+  }
+
+  /* Carga inicial. Devuelve una promesa porque en modo servidor hay que esperar
+     a la base de datos antes de pintar nada. */
+  function iniciar(modo) {
+    sync.modo = modo;
+
+    if (modo !== 'servidor') {
+      var copia = leerDelNavegador();
+      if (copia) { aplicarRegistro({ datos: copia.datos, version: copia.version }); }
+      sync.situacion = 'inactivo';
+      return Promise.resolve();
+    }
+
+    return App.api.leerEstado().then(function (registro) {
+      aplicarRegistro(registro);
+      guardarEnNavegador();
+      sync.situacion = 'guardado';
+    }).catch(function (err) {
+      /* Sin respuesta del servidor se trabaja con la última copia conocida,
+         pero dejándolo claro: lo que se vea puede estar desfasado. */
+      var copia = leerDelNavegador();
+      if (copia) { aplicarRegistro({ datos: copia.datos, version: copia.version }); }
+      sync.situacion = 'error';
+      sync.mensaje = 'No se pudo leer del servidor. Se muestra la última copia de este dispositivo.';
+      throw err;
+    });
   }
 
   App.store = {
@@ -932,25 +1249,61 @@ tfoot td {
       }
       return null;
     },
-    init: cargar,
+
+    iniciar: iniciar,
     estado: function () { return estado; },
-    /* muta(fn) aplica el cambio, persiste y avisa a las vistas. */
+    sincronizacion: function () { return sync; },
+
+    /* muta(fn) aplica el cambio, deja copia local al instante y programa el
+       guardado en el servidor. Las vistas la usan igual que antes. */
     muta: function (fn) {
       fn(estado);
-      guardar();
+      guardarEnNavegador();
+      programarGuardado();
       notificar();
     },
+
+    /* Fuerza el envío inmediato, sin esperar la pausa. */
+    guardarYa: function () {
+      if (temporizador) { clearTimeout(temporizador); }
+      hayCambiosPendientes = true;
+      enviar();
+    },
+
     reiniciar: function () {
       estado = estadoPorDefecto();
-      guardar();
+      guardarEnNavegador();
+      programarGuardado();
       notificar();
     },
+
     exportar: function () { return JSON.parse(JSON.stringify(estado)); },
+
     importar: function (obj) {
       estado = fusiona(estadoPorDefecto(), obj);
-      guardar();
+      guardarEnNavegador();
+      programarGuardado();
       notificar();
     },
+
+    /* Adopta lo que hay en el servidor, descartando los cambios locales. */
+    adoptarDelServidor: function (registro) {
+      aplicarRegistro(registro);
+      guardarEnNavegador();
+      hayCambiosPendientes = false;
+      sync.conflicto = null;
+      cambiarSituacion('guardado');
+      notificar();
+    },
+
+    /* Impone lo local sobre lo del servidor, tras un conflicto. */
+    imponerLocal: function (versionServidor) {
+      sync.version = versionServidor;
+      sync.conflicto = null;
+      hayCambiosPendientes = true;
+      enviar();
+    },
+
     suscribir: function (fn) { suscriptores.push(fn); }
   };
 })(window.App = window.App || {});
@@ -3519,6 +3872,171 @@ tfoot td {
   };
 })(window.App = window.App || {});
 
+/* ===== 80-sesion.js ===== */
+/* Pantalla de acceso, indicador de sincronización y resolución de conflictos. */
+(function (App) {
+  'use strict';
+
+  var el = App.ui.el;
+  var icono = App.ui.icono;
+
+  /* ---------- Pantalla de acceso ---------- */
+
+  function pantallaAcceso(mensaje) {
+    var cfg = App.api.estado();
+    var raiz = document.getElementById('app');
+    App.ui.vaciar(raiz);
+    raiz.className = 'acceso';
+
+    var contenedorBoton = el('div', { class: 'boton-google' });
+    var error = el('div', { class: 'apilar junto', style: 'width:100%' });
+
+    function fallo(err) {
+      App.ui.vaciar(error);
+      error.appendChild(el('div', { class: 'aviso error' }, [
+        icono('aviso'),
+        el('div', { text: err && err.message ? err.message : String(err) })
+      ]));
+    }
+
+    raiz.appendChild(el('div', { class: 'tarjeta tarjeta-acceso' }, [
+      el('div', { class: 'marca-acceso' }, [
+        el('div', { class: 'marca-titulo', text: 'Gestión Electoral' }),
+        el('div', { class: 'marca-sub', text: 'Administración de gastos' })
+      ]),
+      el('p', {
+        class: 'silencio',
+        text: 'Los datos de la convocatoria están en el servidor. Identifíquese con la cuenta de Google autorizada para acceder.'
+      }),
+      mensaje ? el('div', { class: 'aviso' }, [icono('aviso'), el('div', { text: mensaje })]) : null,
+      !cfg.configurado
+        ? el('div', { class: 'aviso error' }, [
+            icono('aviso'),
+            el('div', {}, [
+              el('strong', { text: 'El acceso no está configurado en el servidor. ' }),
+              cfg.aviso || ''
+            ])
+          ])
+        : contenedorBoton,
+      error
+    ]));
+
+    if (cfg.configurado) {
+      App.api.pintarBotonAcceso(
+        contenedorBoton,
+        function () { App.arrancarAplicacion(); },
+        fallo
+      );
+    }
+  }
+
+  /* ---------- Indicador de sincronización ---------- */
+
+  var ETIQUETAS = {
+    guardando: { texto: 'Guardando…', clase: 'sync-trabajando' },
+    guardado: { texto: 'Guardado', clase: 'sync-ok' },
+    pendiente: { texto: 'Cambios sin guardar', clase: 'sync-trabajando' },
+    error: { texto: 'Sin guardar', clase: 'sync-error' },
+    conflicto: { texto: 'Conflicto', clase: 'sync-error' },
+    inactivo: { texto: 'Sólo en este navegador', clase: 'sync-local' }
+  };
+
+  function indicador() {
+    var s = App.store.sincronizacion();
+    var e = ETIQUETAS[s.situacion] || ETIQUETAS.inactivo;
+
+    var detalle = null;
+    if (s.modo === 'servidor' && s.situacion === 'guardado' && s.actualizado) {
+      detalle = 'Última vez: ' + App.ui.fecha(new Date(s.actualizado)) +
+        (s.actualizadoPor ? ' · ' + s.actualizadoPor : '');
+    } else if (s.mensaje) {
+      detalle = s.mensaje;
+    } else if (s.modo !== 'servidor') {
+      detalle = 'Sin servidor: los datos no se comparten con otros dispositivos.';
+    }
+
+    return el('div', { class: 'estado-sync ' + e.clase }, [
+      el('div', { class: 'fila' }, [
+        el('span', { class: 'punto-sync' }),
+        el('strong', { text: e.texto })
+      ]),
+      detalle ? el('p', { class: 'silencio', text: detalle }) : null
+    ]);
+  }
+
+  function fichaUsuario() {
+    var sesion = App.api.estado().sesion;
+    if (!sesion) { return null; }
+
+    return el('div', { class: 'ficha-usuario' }, [
+      el('div', { class: 'crece' }, [
+        el('strong', { class: 'nombre-usuario', text: sesion.nombre }),
+        el('span', { class: 'silencio', text: sesion.correo })
+      ]),
+      el('button', {
+        class: 'btn fantasma pequeno',
+        title: 'Cerrar sesión',
+        onClick: function () {
+          App.ui.confirmar({
+            titulo: 'Cerrar sesión',
+            parrafos: ['Se cerrará la sesión en este dispositivo. Los datos guardados no se pierden.'],
+            textoConfirmar: 'Cerrar sesión',
+            alConfirmar: function () {
+              App.api.cerrarSesion();
+              pantallaAcceso('Sesión cerrada.');
+            }
+          });
+        }
+      }, 'Salir')
+    ]);
+  }
+
+  /* ---------- Conflicto entre dispositivos ---------- */
+
+  function resolverConflicto(registro) {
+    App.ui.confirmar({
+      titulo: 'Otro dispositivo guardó cambios',
+      parrafos: [
+        'Mientras trabajaba aquí, ' + (registro && registro.actualizadoPor ? registro.actualizadoPor : 'otra sesión') +
+          ' guardó una versión distinta de la convocatoria' +
+          (registro && registro.actualizado ? ' el ' + App.ui.fecha(new Date(registro.actualizado)) : '') + '.',
+        'No se ha sobrescrito nada. Elija con cuál se queda: sus cambios de este dispositivo, o los que hay en el servidor.'
+      ],
+      aviso: 'Lo que descarte no se puede recuperar. Si tiene dudas, exporte antes una copia desde «Carga de Datos».',
+      textoCancelar: 'Quedarme con lo del servidor',
+      textoConfirmar: 'Imponer mis cambios',
+      peligro: true,
+      alConfirmar: function () {
+        App.store.imponerLocal(registro ? registro.version : 0);
+        App.ui.flotante('Sus cambios se han guardado sobre los del servidor');
+      }
+    });
+
+    /* «Cancelar» equivale a adoptar lo del servidor, así que se engancha al
+       cierre del diálogo por esa vía. */
+    var velo = document.querySelector('.velo-modal');
+    if (!velo) { return; }
+    var cancelar = velo.querySelector('.pie-modal .btn.secundario');
+    if (cancelar) {
+      cancelar.addEventListener('click', function () {
+        if (registro) {
+          App.store.adoptarDelServidor(registro);
+          App.ui.flotante('Se ha cargado la versión del servidor');
+        }
+      });
+    }
+  }
+
+  App.sesion = {
+    pantallaAcceso: pantallaAcceso,
+    indicador: indicador,
+    fichaUsuario: fichaUsuario
+  };
+
+  App.pedirSesion = function (mensaje) { pantallaAcceso(mensaje || 'La sesión ha caducado.'); };
+  App.resolverConflicto = resolverConflicto;
+})(window.App = window.App || {});
+
 /* ===== 90-app.js ===== */
 /* Armazón de la aplicación: navegación, pintado y arranque. */
 (function (App) {
@@ -3560,8 +4078,9 @@ tfoot td {
           onClick: function () { App.irA(v.id); }
         }, [icono(v.icono), v.nombre]);
       })),
-      el('div', { style: 'margin-top:auto' }, [
-        el('p', { class: 'silencio', text: 'Datos guardados en este navegador' })
+      el('div', { class: 'pie-lateral' }, [
+        App.sesion.indicador(),
+        App.sesion.fichaUsuario()
       ])
     ]);
   }
@@ -3631,9 +4150,68 @@ tfoot td {
     window.scrollTo(0, 0);
   };
 
+  function cargando(texto) {
+    var raiz = document.getElementById('app');
+    App.ui.vaciar(raiz);
+    raiz.className = 'acceso';
+    raiz.appendChild(el('div', { class: 'tarjeta tarjeta-acceso' }, [
+      el('div', { class: 'marca-titulo', text: 'Gestión Electoral' }),
+      el('p', { class: 'silencio', text: texto })
+    ]));
+  }
+
+  /* Carga los datos y pinta. Se llama al arrancar y tras iniciar sesión. */
+  App.arrancarAplicacion = function () {
+    cargando('Cargando la convocatoria…');
+    App.store.iniciar('servidor')
+      .then(function () { App.render(); })
+      .catch(function (err) {
+        if (err && (err.estado === 401 || err.estado === 403)) {
+          App.sesion.pantallaAcceso(err.message);
+          return;
+        }
+        /* Otro tipo de fallo: se entra igualmente con la última copia local y
+           el indicador deja claro que no está sincronizado. */
+        App.render();
+        App.ui.flotante(err && err.message ? err.message : 'No se pudo leer del servidor', true);
+      });
+  };
+
   App.iniciar = function () {
-    App.store.init();
-    App.render();
+    cargando('Conectando…');
+
+    App.api.detectarModo().then(function (cfg) {
+      if (cfg.modo !== 'servidor') {
+        /* Sin API detrás: la aplicación funciona sola con los datos de este
+           navegador. Es el caso de la vista previa y del fichero suelto. */
+        return App.store.iniciar('local').then(function () { App.render(); });
+      }
+
+      if (!cfg.configurado) {
+        App.sesion.pantallaAcceso();
+        return;
+      }
+
+      /* En desarrollo el servidor no verifica identidad, así que no hay nada
+         que iniciar. Nunca ocurre en Cloud Run: el servidor se niega a arrancar
+         en ese modo si detecta que está desplegado. */
+      if (cfg.modoAuth === 'desarrollo') {
+        App.arrancarAplicacion();
+        return;
+      }
+
+      /* Si hay credencial de antes en esta pestaña, se intenta reutilizar. */
+      if (cfg.credencial) {
+        return App.api.verificarSesion()
+          .then(function () { App.arrancarAplicacion(); })
+          .catch(function () { App.sesion.pantallaAcceso(); });
+      }
+
+      App.sesion.pantallaAcceso();
+    }).catch(function (err) {
+      console.error(err);
+      App.store.iniciar('local').then(function () { App.render(); });
+    });
   };
 
   if (document.readyState === 'loading') {
