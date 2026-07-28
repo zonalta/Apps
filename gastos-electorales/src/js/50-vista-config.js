@@ -169,6 +169,118 @@
     ]);
   }
 
+  /* ---------- Usuarios con acceso ---------- */
+
+  /* null = todavía no se ha pedido; 'cargando'; { administradores, colaboradores,
+     esAdmin }; o { error }. Vive fuera del render porque la carga es asíncrona
+     y el render de la vista es síncrono: se pide una vez y se repinta al llegar. */
+  var usuarios = null;
+
+  function cargarUsuarios() {
+    usuarios = 'cargando';
+    App.api.listarUsuarios()
+      .then(function (res) { usuarios = res; App.render(); })
+      .catch(function (err) { usuarios = { error: err.message }; App.render(); });
+  }
+
+  function darAcceso(correo, input) {
+    App.api.darAcceso(correo)
+      .then(function (res) {
+        usuarios.administradores = res.administradores;
+        usuarios.colaboradores = res.colaboradores;
+        input.value = '';
+        App.ui.flotante('Acceso concedido a ' + correo);
+        App.render();
+      })
+      .catch(function (err) { App.ui.flotante(err.message, true); });
+  }
+
+  function quitarAcceso(correo) {
+    App.ui.confirmar({
+      titulo: 'Quitar el acceso',
+      parrafos: ['Se quitará el acceso de ' + correo + ' a esta aplicación. Podrá volver a dárselo cuando quiera.'],
+      textoConfirmar: 'Quitar acceso',
+      peligro: true,
+      alConfirmar: function () {
+        App.api.quitarAcceso(correo)
+          .then(function (res) {
+            usuarios.administradores = res.administradores;
+            usuarios.colaboradores = res.colaboradores;
+            App.ui.flotante('Acceso retirado');
+            App.render();
+          })
+          .catch(function (err) { App.ui.flotante(err.message, true); });
+      }
+    });
+  }
+
+  function formularioAcceso() {
+    var input = el('input', { type: 'text', placeholder: 'correo@gmail.com', 'aria-label': 'Correo a autorizar' });
+    return el('form', {
+      class: 'fila',
+      style: 'margin-top:14px',
+      onSubmit: function (e) {
+        e.preventDefault();
+        var correo = input.value.trim();
+        if (correo) { darAcceso(correo, input); }
+      }
+    }, [
+      el('div', { class: 'crece' }, [input]),
+      el('button', { class: 'btn secundario', type: 'submit' }, [icono('grupo', 16), 'Dar acceso'])
+    ]);
+  }
+
+  function filaUsuario(correo, etiqueta, chipClase, permiteQuitar) {
+    return el('div', { class: 'fila-usuario' }, [
+      el('span', { class: 'crece', text: correo }),
+      el('span', { class: 'chip ' + chipClase, text: etiqueta }),
+      permiteQuitar
+        ? el('button', {
+            class: 'btn peligro pequeno',
+            onClick: function () { quitarAcceso(correo); }
+          }, [icono('papelera', 14), 'Quitar'])
+        : null
+    ]);
+  }
+
+  function tarjetaUsuarios() {
+    /* Sin servidor no hay sesión que gestionar: cada navegador es un mundo. */
+    if (App.api.estado().modo !== 'servidor') { return null; }
+    if (usuarios === null) { cargarUsuarios(); }
+
+    var cuerpo;
+    if (usuarios === 'cargando' || usuarios === null) {
+      cuerpo = el('p', { class: 'silencio', text: 'Cargando…' });
+    } else if (usuarios.error) {
+      cuerpo = el('div', { class: 'aviso error' }, [icono('aviso'), el('div', { text: usuarios.error })]);
+    } else {
+      var filas = usuarios.administradores.map(function (correo) {
+        return filaUsuario(correo, 'Administrador', 'ok', false);
+      }).concat(usuarios.colaboradores.map(function (c) {
+        return filaUsuario(c.correo, 'Colaborador', 'pendiente', usuarios.esAdmin);
+      }));
+
+      cuerpo = el('div', {}, [
+        el('div', { class: 'apilar junto' }, filas),
+        usuarios.esAdmin
+          ? formularioAcceso()
+          : el('p', {
+              class: 'silencio', style: 'margin-top:14px',
+              text: 'Sólo un administrador puede añadir o quitar el acceso de otras cuentas.'
+            })
+      ]);
+    }
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [el('h2', {}, [icono('identidad'), 'Usuarios con acceso'])]),
+      el('p', {
+        class: 'silencio',
+        text: 'Quién puede entrar con su cuenta de Google. Los administradores se fijan al desplegar el servicio y no se pueden quitar desde aquí; los colaboradores se gestionan libremente.'
+      }),
+      cuerpo
+    ]);
+  }
+
   App.vistas = App.vistas || {};
   App.vistas.configuracion = {
     titulo: 'Configuración de Importes',
@@ -181,7 +293,8 @@
           tarjetaSecretarios()
         ]),
         tarjetaFijas(),
-        tarjetaCoordinadores()
+        tarjetaCoordinadores(),
+        tarjetaUsuarios()
       ]);
     }
   };

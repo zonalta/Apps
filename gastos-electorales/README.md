@@ -54,7 +54,8 @@ No hay dependencias ni `node_modules`: `build.js` sólo concatena `src/`.
 | `src/js/90-app.js` | Navegación y arranque |
 | `server.js` | Servidor: estáticos y API |
 | `servidor/almacen.js` | Persistencia (Firestore o memoria) con control de versiones |
-| `servidor/autenticacion.js` | Verificación de la cuenta de Google y lista de autorizados |
+| `servidor/autenticacion.js` | Verificación de la cuenta de Google |
+| `servidor/usuarios.js` | Administradores fijos y colaboradores gestionables desde la app |
 | `servidor/api.js` | Rutas de la API |
 | `Dockerfile` | Compilación en dos etapas: genera `dist/` y sirve sólo lo necesario |
 
@@ -184,6 +185,23 @@ cualquier acción que dependiera de ella quedaba muerta sin dar señal.
 
 Al añadir interacciones nuevas conviene respetar esta regla: las descargas y
 `localStorage` sí funcionan dentro del marco, los diálogos nativos no.
+
+## Gestión de usuarios
+
+En «Configuración de Importes» hay una tarjeta **«Usuarios con acceso»** con dos
+niveles:
+
+- **Administradores** — los correos de la variable `CORREOS_AUTORIZADOS` del
+  servicio. Fijos: sólo cambian volviendo a desplegar, y **no se pueden quitar
+  desde la aplicación**. Es la salvaguarda contra quedarse fuera por un
+  descuido gestionando usuarios. Pueden añadir o quitar colaboradores.
+- **Colaboradores** — correos añadidos desde la propia app, guardados en
+  Firestore. Pueden usar la aplicación con normalidad, pero no pueden dar ni
+  quitar acceso a nadie más.
+
+La comprobación de quién es administrador la hace siempre el servidor a partir
+de la variable de entorno, nunca el cliente: aunque alguien manipule las
+peticiones, no puede concederse permisos que no tiene.
 
 ## Reutilizar la herramienta en otra convocatoria
 
