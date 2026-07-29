@@ -938,7 +938,8 @@ tfoot td {
     clienteId: null,
     aviso: null,
     sesion: null,      // { correo, nombre, foto }
-    credencial: null
+    credencial: null,
+    version: null      // { commit, revision } — null en modo local
   };
 
   function recordarCredencial(valor) {
@@ -996,6 +997,7 @@ tfoot td {
         estado.aviso = cfg.aviso;
         estado.modoAuth = cfg.modo;
         estado.configurado = cfg.configurado === true;
+        estado.version = cfg.version || null;
         estado.credencial = recuperarCredencial();
         return estado;
       })
@@ -2644,6 +2646,29 @@ tfoot td {
     ]);
   }
 
+  /* Qué código y qué revisión de Cloud Run sirven esta pestaña, para comprobar
+     sin salir de la aplicación si un cambio recién fusionado ya está en
+     producción. Sin servidor (vista previa local) no hay nada que mostrar. */
+  function tarjetaVersion() {
+    var v = App.api.estado().version;
+    if (!v || !v.commit) { return null; }
+
+    function fila(etiqueta, valor) {
+      return el('div', { class: 'campo-linea' }, [
+        el('label', { text: etiqueta }),
+        el('span', { class: 'num', text: valor })
+      ]);
+    }
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [el('h2', {}, [icono('documento'), 'Versión desplegada'])]),
+      el('div', { class: 'apilar junto' }, [
+        fila('Código (commit)', v.commit),
+        v.revision ? fila('Revisión de Cloud Run', v.revision) : null
+      ])
+    ]);
+  }
+
   App.vistas = App.vistas || {};
   App.vistas.configuracion = {
     titulo: 'Configuración de Importes',
@@ -2657,7 +2682,8 @@ tfoot td {
         ]),
         tarjetaFijas(),
         tarjetaCoordinadores(),
-        tarjetaUsuarios()
+        tarjetaUsuarios(),
+        tarjetaVersion()
       ]);
     }
   };
@@ -4316,10 +4342,22 @@ tfoot td {
     ]);
   }
 
+  /* Identifica qué código está sirviendo esta pestaña: el commit corto que
+     fijó el despliegue y, si se conoce, la revisión que le puso Cloud Run
+     (sube sola en cada despliegue). Sirve para comprobar sin salir de la
+     aplicación si un cambio recién fusionado ya está en producción. */
+  function textoVersion() {
+    var v = App.api.estado().version;
+    if (!v || !v.commit) { return null; }
+    return { texto: 'commit ' + v.commit, detalle: v.revision ? 'Cloud Run: ' + v.revision : null };
+  }
+
   function pie() {
+    var v = textoVersion();
     return el('footer', { class: 'pie no-imprimir' }, [
       el('span', { text: 'Sistema de gestión de colaboradores electorales — Canarias' }),
-      el('span', { text: App.geo.MUNICIPIOS.length + ' municipios · 7 islas · 2 provincias' })
+      el('span', { text: App.geo.MUNICIPIOS.length + ' municipios · 7 islas · 2 provincias' }),
+      v ? el('span', { text: v.texto, title: v.detalle || '' }) : null
     ]);
   }
 

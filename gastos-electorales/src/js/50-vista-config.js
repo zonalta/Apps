@@ -281,6 +281,29 @@
     ]);
   }
 
+  /* Qué código y qué revisión de Cloud Run sirven esta pestaña, para comprobar
+     sin salir de la aplicación si un cambio recién fusionado ya está en
+     producción. Sin servidor (vista previa local) no hay nada que mostrar. */
+  function tarjetaVersion() {
+    var v = App.api.estado().version;
+    if (!v || !v.commit) { return null; }
+
+    function fila(etiqueta, valor) {
+      return el('div', { class: 'campo-linea' }, [
+        el('label', { text: etiqueta }),
+        el('span', { class: 'num', text: valor })
+      ]);
+    }
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [el('h2', {}, [icono('documento'), 'Versión desplegada'])]),
+      el('div', { class: 'apilar junto' }, [
+        fila('Código (commit)', v.commit),
+        v.revision ? fila('Revisión de Cloud Run', v.revision) : null
+      ])
+    ]);
+  }
+
   App.vistas = App.vistas || {};
   App.vistas.configuracion = {
     titulo: 'Configuración de Importes',
@@ -294,7 +317,8 @@
         ]),
         tarjetaFijas(),
         tarjetaCoordinadores(),
-        tarjetaUsuarios()
+        tarjetaUsuarios(),
+        tarjetaVersion()
       ]);
     }
   };

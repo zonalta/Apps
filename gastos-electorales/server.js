@@ -95,6 +95,7 @@ const servidor = http.createServer(async (req, res) => {
     res.end(JSON.stringify({
       estado: 'ok',
       version: process.env.K_REVISION || 'local',
+      commit: process.env.GIT_SHA ? process.env.GIT_SHA.slice(0, 7) : null,
       almacen: almacen.tipo,
       autenticacion: autenticacion.configurado() ? 'configurada' : 'sin configurar'
     }));

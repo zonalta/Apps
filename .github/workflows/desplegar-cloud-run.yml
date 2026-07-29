@@ -51,6 +51,7 @@ jobs:
             --min-instances 0 \
             --max-instances 3 \
             --allow-unauthenticated \
+            --update-env-vars "GIT_SHA=${GITHUB_SHA}" \
             --quiet
 
       - name: Comprobar que el servicio responde
