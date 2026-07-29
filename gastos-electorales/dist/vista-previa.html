@@ -1065,8 +1065,8 @@ tfoot td {
       return peticion('/api/estado', { metodo: 'PUT', cuerpo: { version: version, datos: datos } });
     },
     listarUsuarios: function () { return peticion('/api/usuarios'); },
-    darAcceso: function (correo) {
-      return peticion('/api/usuarios', { metodo: 'POST', cuerpo: { correo: correo } });
+    darAcceso: function (correo, rol) {
+      return peticion('/api/usuarios', { metodo: 'POST', cuerpo: { correo: correo, rol: rol } });
     },
     quitarAcceso: function (correo) {
       return peticion('/api/usuarios', { metodo: 'DELETE', cuerpo: { correo: correo } });
@@ -2532,6 +2532,14 @@ tfoot td {
      y el render de la vista es síncrono: se pide una vez y se repinta al llegar. */
   var usuarios = null;
 
+  /* Editor: acceso completo salvo gestionar usuarios (lo que ya tenía
+     «colaborador»). Consulta: sólo el Dashboard de Informes, sin poder
+     guardar nada — lo impone el servidor, esto es sólo la etiqueta. */
+  var ROL_INFO = {
+    editor: { etiqueta: 'Editor', chip: 'pendiente' },
+    consulta: { etiqueta: 'Consulta', chip: 'aviso' }
+  };
+
   function cargarUsuarios() {
     usuarios = 'cargando';
     App.api.listarUsuarios()
@@ -2539,8 +2547,8 @@ tfoot td {
       .catch(function (err) { usuarios = { error: err.message }; App.render(); });
   }
 
-  function darAcceso(correo, input) {
-    App.api.darAcceso(correo)
+  function darAcceso(correo, rol, input) {
+    App.api.darAcceso(correo, rol)
       .then(function (res) {
         usuarios.administradores = res.administradores;
         usuarios.colaboradores = res.colaboradores;
@@ -2572,17 +2580,28 @@ tfoot td {
 
   function formularioAcceso() {
     var input = el('input', { type: 'text', placeholder: 'correo@gmail.com', 'aria-label': 'Correo a autorizar' });
-    return el('form', {
-      class: 'fila',
-      style: 'margin-top:14px',
-      onSubmit: function (e) {
-        e.preventDefault();
-        var correo = input.value.trim();
-        if (correo) { darAcceso(correo, input); }
-      }
-    }, [
-      el('div', { class: 'crece' }, [input]),
-      el('button', { class: 'btn secundario', type: 'submit' }, [icono('grupo', 16), 'Dar acceso'])
+    var select = el('select', { 'aria-label': 'Papel', style: 'width:auto' }, [
+      el('option', { value: 'editor', text: 'Editor — acceso completo' }),
+      el('option', { value: 'consulta', text: 'Consulta — solo Dashboard' })
+    ]);
+    return el('div', {}, [
+      el('form', {
+        class: 'fila',
+        style: 'margin-top:14px',
+        onSubmit: function (e) {
+          e.preventDefault();
+          var correo = input.value.trim();
+          if (correo) { darAcceso(correo, select.value, input); }
+        }
+      }, [
+        el('div', { class: 'crece' }, [input]),
+        select,
+        el('button', { class: 'btn secundario', type: 'submit' }, [icono('grupo', 16), 'Dar acceso'])
+      ]),
+      el('p', {
+        class: 'silencio', style: 'margin-top:6px',
+        text: 'Si el correo ya tiene acceso, esto actualiza su papel en vez de duplicarlo.'
+      })
     ]);
   }
 
@@ -2613,7 +2632,8 @@ tfoot td {
       var filas = usuarios.administradores.map(function (correo) {
         return filaUsuario(correo, 'Administrador', 'ok', false);
       }).concat(usuarios.colaboradores.map(function (c) {
-        return filaUsuario(c.correo, 'Colaborador', 'pendiente', usuarios.esAdmin);
+        var info = ROL_INFO[c.rol] || ROL_INFO.editor;
+        return filaUsuario(c.correo, info.etiqueta, info.chip, usuarios.esAdmin);
       }));
 
       cuerpo = el('div', {}, [
@@ -2631,7 +2651,7 @@ tfoot td {
       el('header', {}, [el('h2', {}, [icono('identidad'), 'Usuarios con acceso'])]),
       el('p', {
         class: 'silencio',
-        text: 'Quién puede entrar con su cuenta de Google. Los administradores se fijan al desplegar el servicio y no se pueden quitar desde aquí; los colaboradores se gestionan libremente.'
+        text: 'Quién puede entrar con su cuenta de Google. Los administradores se fijan al desplegar el servicio y no se pueden quitar desde aquí. De los colaboradores, un editor tiene acceso completo salvo gestionar usuarios; una cuenta de consulta sólo ve el Dashboard de Informes, sin poder guardar ningún cambio.'
       }),
       cuerpo
     ]);
@@ -4072,16 +4092,19 @@ tfoot td {
   }
 
   function sinDatos() {
+    var esConsulta = App.sesion.esConsulta();
     return el('section', { class: 'tarjeta' }, [
       el('div', { class: 'aviso' }, [
         icono('aviso'),
         el('div', {}, [
           el('strong', { text: 'Todavía no hay mesas cargadas. ' }),
-          'El número de mesas por municipio es la base de casi todos los cálculos. ' +
-          'Vaya a «Carga de Datos», descargue la plantilla CSV con los 88 municipios y súbala rellena.'
+          'El número de mesas por municipio es la base de casi todos los cálculos.' +
+          (esConsulta
+            ? ' Pídale a un editor o administrador que las cargue desde «Carga de Datos».'
+            : ' Vaya a «Carga de Datos», descargue la plantilla CSV con los 88 municipios y súbala rellena.')
         ])
       ]),
-      el('div', { class: 'fila', style: 'margin-top:18px' }, [
+      esConsulta ? null : el('div', { class: 'fila', style: 'margin-top:18px' }, [
         el('button', {
           class: 'btn',
           onClick: function () { App.irA('datos'); }
@@ -4275,10 +4298,20 @@ tfoot td {
     }
   }
 
+  /* Consulta es el único papel que restringe qué ve la interfaz (los demás
+     sólo cambian qué botones de gestión de usuarios aparecen). Sin sesión
+     (modo local, o servidor en el instante antes de identificarse) no hay
+     restricción: no tiene sentido limitar un cuaderno de trabajo personal. */
+  function esConsulta() {
+    var sesion = App.api.estado().sesion;
+    return Boolean(sesion && sesion.rol === 'consulta');
+  }
+
   App.sesion = {
     pantallaAcceso: pantallaAcceso,
     indicador: indicador,
-    fichaUsuario: fichaUsuario
+    fichaUsuario: fichaUsuario,
+    esConsulta: esConsulta
   };
 
   App.pedirSesion = function (mensaje) { pantallaAcceso(mensaje || 'La sesión ha caducado.'); };
@@ -4314,13 +4347,22 @@ tfoot td {
     ]);
   }
 
+  /* Consulta sólo ve el Dashboard: ni Configuración de Importes ni Carga de
+     Datos aparecen en el menú. Es sólo la parte visible de la restricción —
+     el servidor rechaza igualmente cualquier guardado que viniera de una
+     sesión de consulta aunque llegase por otro camino. */
+  function vistasVisibles() {
+    if (!App.sesion.esConsulta()) { return VISTAS; }
+    return VISTAS.filter(function (v) { return v.id === 'dashboard'; });
+  }
+
   function barraLateral() {
     return el('nav', { class: 'sidebar no-imprimir', 'aria-label': 'Navegación principal' }, [
       el('div', {}, [
         el('div', { class: 'marca-titulo', text: 'Gestión Electoral' }),
         el('div', { class: 'marca-sub', text: 'Administración de gastos' })
       ]),
-      el('div', { class: 'nav' }, VISTAS.map(function (v) {
+      el('div', { class: 'nav' }, vistasVisibles().map(function (v) {
         return el('button', {
           'aria-current': actual === v.id ? 'page' : null,
           onClick: function () { App.irA(v.id); }
@@ -4404,7 +4446,10 @@ tfoot td {
   };
 
   App.irA = function (id) {
-    actual = id;
+    /* Cierra el paso también aquí, no sólo ocultando el botón del menú: así
+       da igual por dónde se intente llegar (un enlace de otra vista, por
+       ejemplo). */
+    actual = (App.sesion.esConsulta() && id !== 'dashboard') ? 'dashboard' : id;
     menuAbierto = false;
     App.render();
     window.scrollTo(0, 0);
@@ -4452,11 +4497,13 @@ tfoot td {
         return;
       }
 
-      /* En desarrollo el servidor no verifica identidad, así que no hay nada
-         que iniciar. Nunca ocurre en Cloud Run: el servidor se niega a arrancar
-         en ese modo si detecta que está desplegado. */
+      /* En desarrollo el servidor no verifica identidad, pero /api/sesion
+         sigue devolviendo el papel simulado: se pide igualmente para que la
+         navegación y el resto de la interfaz vean el mismo `rol` que verían
+         en producción. Nunca ocurre en Cloud Run: el servidor se niega a
+         arrancar en modo desarrollo si detecta que está desplegado. */
       if (cfg.modoAuth === 'desarrollo') {
-        App.arrancarAplicacion();
+        App.api.verificarSesion().then(App.arrancarAplicacion).catch(App.arrancarAplicacion);
         return;
       }
 

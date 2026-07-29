@@ -39,11 +39,12 @@ function extraerCredencial(req) {
   return null;
 }
 
-/* Devuelve { correo, nombre, foto } o lanza un error con .estado y .mensaje. */
+/* Devuelve { correo, nombre, foto, esAdmin, rol } o lanza un error con .estado
+   y .mensaje. `rol` es 'administrador' | 'editor' | 'consulta'. */
 async function identificar(req) {
   if (MODO === 'desarrollo') {
     console.warn('AUTH_MODO=desarrollo — petición aceptada sin verificar identidad.');
-    return { correo: 'desarrollo@local', nombre: 'Modo desarrollo', foto: null, esAdmin: true };
+    return { correo: 'desarrollo@local', nombre: 'Modo desarrollo', foto: null, esAdmin: true, rol: 'administrador' };
   }
 
   if (!configurado()) {
@@ -81,7 +82,8 @@ async function identificar(req) {
   }
 
   const correo = carga.email.toLowerCase();
-  if (!(await usuarios.estaAutorizado(correo))) {
+  const rol = await usuarios.rolDe(correo);
+  if (!rol) {
     const err = new Error('La cuenta ' + correo + ' no tiene acceso a esta aplicación.');
     err.estado = 403;
     throw err;
@@ -91,7 +93,8 @@ async function identificar(req) {
     correo: correo,
     nombre: carga.name || correo,
     foto: carga.picture || null,
-    esAdmin: usuarios.esAdmin(correo)
+    esAdmin: usuarios.esAdmin(correo),
+    rol: rol
   };
 }
 

@@ -152,8 +152,8 @@
       return peticion('/api/estado', { metodo: 'PUT', cuerpo: { version: version, datos: datos } });
     },
     listarUsuarios: function () { return peticion('/api/usuarios'); },
-    darAcceso: function (correo) {
-      return peticion('/api/usuarios', { metodo: 'POST', cuerpo: { correo: correo } });
+    darAcceso: function (correo, rol) {
+      return peticion('/api/usuarios', { metodo: 'POST', cuerpo: { correo: correo, rol: rol } });
     },
     quitarAcceso: function (correo) {
       return peticion('/api/usuarios', { metodo: 'DELETE', cuerpo: { correo: correo } });

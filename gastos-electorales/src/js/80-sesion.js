@@ -152,10 +152,20 @@
     }
   }
 
+  /* Consulta es el único papel que restringe qué ve la interfaz (los demás
+     sólo cambian qué botones de gestión de usuarios aparecen). Sin sesión
+     (modo local, o servidor en el instante antes de identificarse) no hay
+     restricción: no tiene sentido limitar un cuaderno de trabajo personal. */
+  function esConsulta() {
+    var sesion = App.api.estado().sesion;
+    return Boolean(sesion && sesion.rol === 'consulta');
+  }
+
   App.sesion = {
     pantallaAcceso: pantallaAcceso,
     indicador: indicador,
-    fichaUsuario: fichaUsuario
+    fichaUsuario: fichaUsuario,
+    esConsulta: esConsulta
   };
 
   App.pedirSesion = function (mensaje) { pantallaAcceso(mensaje || 'La sesión ha caducado.'); };
