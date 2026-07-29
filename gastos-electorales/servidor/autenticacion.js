@@ -95,6 +95,18 @@ async function identificar(req) {
   };
 }
 
+/* Identifica qué código y qué revisión de Cloud Run sirven esta respuesta.
+   GIT_SHA lo fija el propio despliegue (--update-env-vars en el flujo de
+   GitHub Actions); K_REVISION lo pone Cloud Run solo, con un número que sube
+   en cada despliegue. Sin servidor (vista previa local) los dos son null. */
+function version() {
+  const sha = process.env.GIT_SHA || '';
+  return {
+    commit: sha ? sha.slice(0, 7) : null,
+    revision: process.env.K_REVISION || null
+  };
+}
+
 /* Lo que el navegador necesita saber antes de iniciar sesión. El identificador
    de cliente es público por diseño: no es un secreto. */
 function configuracionPublica() {
@@ -102,7 +114,8 @@ function configuracionPublica() {
     modo: MODO,
     clienteId: CLIENT_ID || null,
     configurado: configurado(),
-    aviso: configurado() ? null : motivoSinConfigurar()
+    aviso: configurado() ? null : motivoSinConfigurar(),
+    version: version()
   };
 }
 

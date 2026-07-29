@@ -45,10 +45,22 @@
     ]);
   }
 
+  /* Identifica qué código está sirviendo esta pestaña: el commit corto que
+     fijó el despliegue y, si se conoce, la revisión que le puso Cloud Run
+     (sube sola en cada despliegue). Sirve para comprobar sin salir de la
+     aplicación si un cambio recién fusionado ya está en producción. */
+  function textoVersion() {
+    var v = App.api.estado().version;
+    if (!v || !v.commit) { return null; }
+    return { texto: 'commit ' + v.commit, detalle: v.revision ? 'Cloud Run: ' + v.revision : null };
+  }
+
   function pie() {
+    var v = textoVersion();
     return el('footer', { class: 'pie no-imprimir' }, [
       el('span', { text: 'Sistema de gestión de colaboradores electorales — Canarias' }),
-      el('span', { text: App.geo.MUNICIPIOS.length + ' municipios · 7 islas · 2 provincias' })
+      el('span', { text: App.geo.MUNICIPIOS.length + ' municipios · 7 islas · 2 provincias' }),
+      v ? el('span', { text: v.texto, title: v.detalle || '' }) : null
     ]);
   }
 

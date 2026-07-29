@@ -16,7 +16,8 @@
     clienteId: null,
     aviso: null,
     sesion: null,      // { correo, nombre, foto }
-    credencial: null
+    credencial: null,
+    version: null      // { commit, revision } — null en modo local
   };
 
   function recordarCredencial(valor) {
@@ -74,6 +75,7 @@
         estado.aviso = cfg.aviso;
         estado.modoAuth = cfg.modo;
         estado.configurado = cfg.configurado === true;
+        estado.version = cfg.version || null;
         estado.credencial = recuperarCredencial();
         return estado;
       })
