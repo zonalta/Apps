@@ -460,6 +460,18 @@
     return String(valor);
   }
 
+  /* Los importes van al CSV con el mismo formato que en pantalla: dos decimales
+     y separador de millares. Sin esto salían en crudo, y los que se calculan
+     dividiendo (el importe unitario de los representantes, por ejemplo)
+     arrastraban toda la cola decimal del float. Excel en español lo reconoce
+     como moneda, así que las columnas siguen sumando.
+     Los recuentos se dejan tal cual: son enteros y así no hay ambigüedad. */
+  function celdaCSV(col, valor) {
+    if (valor === '' || valor == null) { return ''; }
+    if (col.dinero) { return euro(valor); }
+    return typeof valor === 'number' ? String(valor).replace('.', ',') : String(valor);
+  }
+
   /* Al pulsar una cabecera se ordena por esa columna; al volver a pulsar la
      misma se invierte el sentido. Cada pestaña recuerda su propio orden, y sin
      elegir ninguno se mantiene el orden por defecto de datosTabla. */
@@ -557,10 +569,7 @@
             onClick: function () {
               var filas = [datos.columnas.map(function (c) { return c.nombre; })];
               datos.filas.forEach(function (fila) {
-                filas.push(datos.columnas.map(function (c) {
-                  var v = fila[c.clave];
-                  return typeof v === 'number' ? String(v).replace('.', ',') : (v == null ? '' : v);
-                }));
+                filas.push(datos.columnas.map(function (c) { return celdaCSV(c, fila[c.clave]); }));
               });
               App.ui.descargar('informe-' + f.pestana + '.csv', App.ui.aCSV(filas));
               App.ui.flotante('CSV descargado');
