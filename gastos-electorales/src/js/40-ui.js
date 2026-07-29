@@ -5,15 +5,21 @@
 (function (App) {
   'use strict';
 
+  /* useGrouping:'always' es imprescindible. El criterio por defecto del español
+     ("min2") deja los millares sin punto en los números de cuatro cifras: 10.360
+     lleva punto pero 1024 no. En una columna de importes eso se lee como un
+     error, así que se fuerza el separador desde el primer millar. */
   var fmtEuro = new Intl.NumberFormat('es-ES', {
     style: 'currency', currency: 'EUR',
-    minimumFractionDigits: 2, maximumFractionDigits: 2
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+    useGrouping: 'always'
   });
   var fmtEuroCorto = new Intl.NumberFormat('es-ES', {
     style: 'currency', currency: 'EUR',
-    minimumFractionDigits: 0, maximumFractionDigits: 0
+    minimumFractionDigits: 0, maximumFractionDigits: 0,
+    useGrouping: 'always'
   });
-  var fmtNum = new Intl.NumberFormat('es-ES');
+  var fmtNum = new Intl.NumberFormat('es-ES', { useGrouping: 'always' });
   var fmtFecha = new Intl.DateTimeFormat('es-ES', {
     day: 'numeric', month: 'long', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
