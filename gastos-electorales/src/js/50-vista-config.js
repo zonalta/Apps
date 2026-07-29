@@ -176,6 +176,14 @@
      y el render de la vista es síncrono: se pide una vez y se repinta al llegar. */
   var usuarios = null;
 
+  /* Editor: acceso completo salvo gestionar usuarios (lo que ya tenía
+     «colaborador»). Consulta: sólo el Dashboard de Informes, sin poder
+     guardar nada — lo impone el servidor, esto es sólo la etiqueta. */
+  var ROL_INFO = {
+    editor: { etiqueta: 'Editor', chip: 'pendiente' },
+    consulta: { etiqueta: 'Consulta', chip: 'aviso' }
+  };
+
   function cargarUsuarios() {
     usuarios = 'cargando';
     App.api.listarUsuarios()
@@ -183,8 +191,8 @@
       .catch(function (err) { usuarios = { error: err.message }; App.render(); });
   }
 
-  function darAcceso(correo, input) {
-    App.api.darAcceso(correo)
+  function darAcceso(correo, rol, input) {
+    App.api.darAcceso(correo, rol)
       .then(function (res) {
         usuarios.administradores = res.administradores;
         usuarios.colaboradores = res.colaboradores;
@@ -216,17 +224,28 @@
 
   function formularioAcceso() {
     var input = el('input', { type: 'text', placeholder: 'correo@gmail.com', 'aria-label': 'Correo a autorizar' });
-    return el('form', {
-      class: 'fila',
-      style: 'margin-top:14px',
-      onSubmit: function (e) {
-        e.preventDefault();
-        var correo = input.value.trim();
-        if (correo) { darAcceso(correo, input); }
-      }
-    }, [
-      el('div', { class: 'crece' }, [input]),
-      el('button', { class: 'btn secundario', type: 'submit' }, [icono('grupo', 16), 'Dar acceso'])
+    var select = el('select', { 'aria-label': 'Papel', style: 'width:auto' }, [
+      el('option', { value: 'editor', text: 'Editor — acceso completo' }),
+      el('option', { value: 'consulta', text: 'Consulta — solo Dashboard' })
+    ]);
+    return el('div', {}, [
+      el('form', {
+        class: 'fila',
+        style: 'margin-top:14px',
+        onSubmit: function (e) {
+          e.preventDefault();
+          var correo = input.value.trim();
+          if (correo) { darAcceso(correo, select.value, input); }
+        }
+      }, [
+        el('div', { class: 'crece' }, [input]),
+        select,
+        el('button', { class: 'btn secundario', type: 'submit' }, [icono('grupo', 16), 'Dar acceso'])
+      ]),
+      el('p', {
+        class: 'silencio', style: 'margin-top:6px',
+        text: 'Si el correo ya tiene acceso, esto actualiza su papel en vez de duplicarlo.'
+      })
     ]);
   }
 
@@ -257,7 +276,8 @@
       var filas = usuarios.administradores.map(function (correo) {
         return filaUsuario(correo, 'Administrador', 'ok', false);
       }).concat(usuarios.colaboradores.map(function (c) {
-        return filaUsuario(c.correo, 'Colaborador', 'pendiente', usuarios.esAdmin);
+        var info = ROL_INFO[c.rol] || ROL_INFO.editor;
+        return filaUsuario(c.correo, info.etiqueta, info.chip, usuarios.esAdmin);
       }));
 
       cuerpo = el('div', {}, [
@@ -275,7 +295,7 @@
       el('header', {}, [el('h2', {}, [icono('identidad'), 'Usuarios con acceso'])]),
       el('p', {
         class: 'silencio',
-        text: 'Quién puede entrar con su cuenta de Google. Los administradores se fijan al desplegar el servicio y no se pueden quitar desde aquí; los colaboradores se gestionan libremente.'
+        text: 'Quién puede entrar con su cuenta de Google. Los administradores se fijan al desplegar el servicio y no se pueden quitar desde aquí. De los colaboradores, un editor tiene acceso completo salvo gestionar usuarios; una cuenta de consulta sólo ve el Dashboard de Informes, sin poder guardar ningún cambio.'
       }),
       cuerpo
     ]);

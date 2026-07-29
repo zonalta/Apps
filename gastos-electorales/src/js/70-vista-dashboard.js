@@ -752,16 +752,19 @@
   }
 
   function sinDatos() {
+    var esConsulta = App.sesion.esConsulta();
     return el('section', { class: 'tarjeta' }, [
       el('div', { class: 'aviso' }, [
         icono('aviso'),
         el('div', {}, [
           el('strong', { text: 'Todavía no hay mesas cargadas. ' }),
-          'El número de mesas por municipio es la base de casi todos los cálculos. ' +
-          'Vaya a «Carga de Datos», descargue la plantilla CSV con los 88 municipios y súbala rellena.'
+          'El número de mesas por municipio es la base de casi todos los cálculos.' +
+          (esConsulta
+            ? ' Pídale a un editor o administrador que las cargue desde «Carga de Datos».'
+            : ' Vaya a «Carga de Datos», descargue la plantilla CSV con los 88 municipios y súbala rellena.')
         ])
       ]),
-      el('div', { class: 'fila', style: 'margin-top:18px' }, [
+      esConsulta ? null : el('div', { class: 'fila', style: 'margin-top:18px' }, [
         el('button', {
           class: 'btn',
           onClick: function () { App.irA('datos'); }

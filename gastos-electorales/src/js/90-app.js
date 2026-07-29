@@ -26,13 +26,22 @@
     ]);
   }
 
+  /* Consulta sólo ve el Dashboard: ni Configuración de Importes ni Carga de
+     Datos aparecen en el menú. Es sólo la parte visible de la restricción —
+     el servidor rechaza igualmente cualquier guardado que viniera de una
+     sesión de consulta aunque llegase por otro camino. */
+  function vistasVisibles() {
+    if (!App.sesion.esConsulta()) { return VISTAS; }
+    return VISTAS.filter(function (v) { return v.id === 'dashboard'; });
+  }
+
   function barraLateral() {
     return el('nav', { class: 'sidebar no-imprimir', 'aria-label': 'Navegación principal' }, [
       el('div', {}, [
         el('div', { class: 'marca-titulo', text: 'Gestión Electoral' }),
         el('div', { class: 'marca-sub', text: 'Administración de gastos' })
       ]),
-      el('div', { class: 'nav' }, VISTAS.map(function (v) {
+      el('div', { class: 'nav' }, vistasVisibles().map(function (v) {
         return el('button', {
           'aria-current': actual === v.id ? 'page' : null,
           onClick: function () { App.irA(v.id); }
@@ -116,7 +125,10 @@
   };
 
   App.irA = function (id) {
-    actual = id;
+    /* Cierra el paso también aquí, no sólo ocultando el botón del menú: así
+       da igual por dónde se intente llegar (un enlace de otra vista, por
+       ejemplo). */
+    actual = (App.sesion.esConsulta() && id !== 'dashboard') ? 'dashboard' : id;
     menuAbierto = false;
     App.render();
     window.scrollTo(0, 0);
@@ -164,11 +176,13 @@
         return;
       }
 
-      /* En desarrollo el servidor no verifica identidad, así que no hay nada
-         que iniciar. Nunca ocurre en Cloud Run: el servidor se niega a arrancar
-         en ese modo si detecta que está desplegado. */
+      /* En desarrollo el servidor no verifica identidad, pero /api/sesion
+         sigue devolviendo el papel simulado: se pide igualmente para que la
+         navegación y el resto de la interfaz vean el mismo `rol` que verían
+         en producción. Nunca ocurre en Cloud Run: el servidor se niega a
+         arrancar en modo desarrollo si detecta que está desplegado. */
       if (cfg.modoAuth === 'desarrollo') {
-        App.arrancarAplicacion();
+        App.api.verificarSesion().then(App.arrancarAplicacion).catch(App.arrancarAplicacion);
         return;
       }
 

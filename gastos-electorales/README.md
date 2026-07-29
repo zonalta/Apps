@@ -55,7 +55,7 @@ No hay dependencias ni `node_modules`: `build.js` sólo concatena `src/`.
 | `server.js` | Servidor: estáticos y API |
 | `servidor/almacen.js` | Persistencia (Firestore o memoria) con control de versiones |
 | `servidor/autenticacion.js` | Verificación de la cuenta de Google |
-| `servidor/usuarios.js` | Administradores fijos y colaboradores gestionables desde la app |
+| `servidor/usuarios.js` | Administradores fijos y colaboradores (editor/consulta) gestionables desde la app |
 | `servidor/api.js` | Rutas de la API |
 | `Dockerfile` | Compilación en dos etapas: genera `dist/` y sirve sólo lo necesario |
 
@@ -188,20 +188,31 @@ Al añadir interacciones nuevas conviene respetar esta regla: las descargas y
 
 ## Gestión de usuarios
 
-En «Configuración de Importes» hay una tarjeta **«Usuarios con acceso»** con dos
-niveles:
+En «Configuración de Importes» hay una tarjeta **«Usuarios con acceso»** con tres
+papeles:
 
-- **Administradores** — los correos de la variable `CORREOS_AUTORIZADOS` del
+- **Administrador** — los correos de la variable `CORREOS_AUTORIZADOS` del
   servicio. Fijos: sólo cambian volviendo a desplegar, y **no se pueden quitar
   desde la aplicación**. Es la salvaguarda contra quedarse fuera por un
-  descuido gestionando usuarios. Pueden añadir o quitar colaboradores.
-- **Colaboradores** — correos añadidos desde la propia app, guardados en
-  Firestore. Pueden usar la aplicación con normalidad, pero no pueden dar ni
-  quitar acceso a nadie más.
+  descuido gestionando usuarios. Acceso completo, incluida la gestión de
+  usuarios.
+- **Editor** — colaborador con acceso completo salvo gestionar quién entra.
+- **Consulta** — colaborador limitado al **Dashboard de Informes**: puede ver,
+  filtrar, ordenar y exportar con todas sus funciones, pero no ve
+  «Configuración de Importes» ni «Carga de Datos», ni puede guardar ningún
+  cambio.
 
-La comprobación de quién es administrador la hace siempre el servidor a partir
-de la variable de entorno, nunca el cliente: aunque alguien manipule las
-peticiones, no puede concederse permisos que no tiene.
+Editores y cuentas de consulta se guardan en Firestore; sólo un administrador
+puede añadirlos, quitarlos o cambiarles el papel (se cambia dándoles de alta
+otra vez con el papel nuevo, desde el mismo formulario).
+
+La comprobación de quién es administrador, y de qué papel tiene cada
+colaborador, la hace siempre el servidor a partir de la variable de entorno y
+de Firestore, nunca el cliente. Ocultar «Configuración de Importes» y «Carga de
+Datos» para una cuenta de consulta es sólo la parte visible: aunque alguien
+manipulase las peticiones, el servidor rechaza cualquier guardado de estado
+(`PUT /api/estado`) que venga de una sesión de consulta, y le niega también el
+acceso a `/api/usuarios`.
 
 ## Reutilizar la herramienta en otra convocatoria
 

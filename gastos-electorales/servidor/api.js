@@ -95,6 +95,16 @@ function crearApi(almacen) {
       }
 
       if (ruta === '/api/estado' && req.method === 'PUT') {
+        /* Consulta puede ver el Dashboard con todas sus funciones, pero nada
+           de lo que hace pasa por aquí (filtros, orden y exportación son sólo
+           de este navegador). Este es el único sitio por el que se guarda
+           cualquier cambio de datos o de configuración, así que basta con
+           cerrarlo aquí: no hace falta repetir la comprobación en cada campo. */
+        if (sesion.rol === 'consulta') {
+          responder(res, 403, { error: 'Esta cuenta es de solo consulta: no puede guardar cambios.' });
+          return true;
+        }
+
         const cuerpo = await leerCuerpo(req);
         if (!cuerpo || typeof cuerpo.version !== 'number') {
           responder(res, 400, { error: 'Falta la versión del estado que se está reemplazando.' });
@@ -118,12 +128,20 @@ function crearApi(almacen) {
         return true;
       }
 
+      /* La gestión de usuarios no forma parte del Dashboard, así que una
+         cuenta de consulta no tiene nada que hacer aquí, ni para leer. */
+      if (ruta === '/api/usuarios' && sesion.rol === 'consulta') {
+        responder(res, 403, { error: 'Esta cuenta es de solo consulta: no gestiona usuarios.' });
+        return true;
+      }
+
       if (ruta === '/api/usuarios' && req.method === 'GET') {
         const colaboradores = await usuarios.listar();
         responder(res, 200, {
           administradores: usuarios.ADMINISTRADORES,
           colaboradores: colaboradores,
-          esAdmin: sesion.esAdmin
+          esAdmin: sesion.esAdmin,
+          roles: usuarios.ROLES
         });
         return true;
       }
@@ -146,7 +164,7 @@ function crearApi(almacen) {
 
         try {
           const colaboradores = req.method === 'POST'
-            ? await usuarios.agregar(cuerpo.correo, sesion.correo)
+            ? await usuarios.agregar(cuerpo.correo, sesion.correo, cuerpo.rol)
             : await usuarios.quitar(cuerpo.correo);
           responder(res, 200, { administradores: usuarios.ADMINISTRADORES, colaboradores: colaboradores });
         } catch (e) {
