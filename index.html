@@ -1,221 +1,538 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <!-- Favicon básico -->
-<link rel="icon" href="icon.png">
-
-<!-- Iconos para Apple/iOS -->
-<link rel="apple-touch-icon" href="icon.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Nombre de tu App">
-<!-- Color del tema para la interfaz del navegador -->
-<meta name="theme-color" content="#4285f4">
+    <link rel="icon" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Corrector y Traductor">
+    <meta name="theme-color" content="#4285f4">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Calculadora Carga VE</title>
+    <title>Corrector y Traductor de Texto</title>
     <style>
-        /* Estilos generales del cuerpo de la página */
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 20px;
-            background-color: #f0f0f5; /* Un gris claro para el fondo */
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #333;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh; /* Asegura que el fondo cubra toda la altura */
-            box-sizing: border-box;
+            min-height: 100vh;
         }
-        /* Contenedor principal de la aplicación */
+
         .container {
             background-color: #ffffff;
-            padding: 20px;
-            border-radius: 12px; /* Bordes más redondeados */
-            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 420px; /* Ancho máximo para buena legibilidad */
-            box-sizing: border-box;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-width: 800px;
+            margin: 0 auto;
         }
-        /* Título de la aplicación */
+
         h1 {
-            color: #007aff; /* Azul estándar de Apple */
+            color: #667eea;
             text-align: center;
-            font-size: 1.75em; /* Tamaño ajustado para móviles */
-            margin-top: 0;
+            font-size: 2em;
+            margin: 0 0 10px 0;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
             margin-bottom: 25px;
         }
-        /* Estilo para las etiquetas de los campos */
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600; /* Un poco más de peso */
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-weight: 600;
             color: #444;
-            font-size: 0.95em;
-        }
-        /* Estilo para los campos de entrada numérica */
-        input[type="number"] {
-            width: 100%; /* Ocupa todo el ancho disponible */
-            padding: 14px; /* Más padding para mejor toque */
-            margin-bottom: 20px;
-            border: 1px solid #c9c9d0; /* Borde sutil */
-            border-radius: 8px;
-            box-sizing: border-box;
-            font-size: 1em;
-            -webkit-appearance: none; /* Quita estilos por defecto en iOS */
-            -moz-appearance: textfield; /* Para Firefox */
-        }
-        /* Oculta las flechas en los campos numéricos para navegadores WebKit (Chrome, Safari) */
-        input::-webkit-outer-spin-button,
-        input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        /* Estilo del botón de calcular */
-        button {
-            background-color: #007aff;
-            color: white;
-            padding: 15px;
-            border: none;
-            border-radius: 8px;
-            width: 100%;
+            margin-bottom: 10px;
             font-size: 1.1em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .icon {
+            font-size: 1.2em;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 150px;
+            transition: border-color 0.3s ease;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        button {
+            padding: 15px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
             font-weight: 600;
             cursor: pointer;
-            transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
-        /* Efecto al presionar el botón */
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background-color: #34c759;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #2da54a;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 199, 89, 0.4);
+        }
+
+        .btn-tertiary {
+            background-color: #ff9500;
+            color: white;
+        }
+
+        .btn-tertiary:hover {
+            background-color: #e08600;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 149, 0, 0.4);
+        }
+
         button:active {
-            background-color: #005ec4;
-            transform: scale(0.98); /* Ligero encogimiento al pulsar */
+            transform: translateY(0);
         }
-        /* Contenedor para mostrar el resultado */
-        #resultado {
-            margin-top: 25px;
-            padding: 18px;
-            background-color: #e6f2ff; /* Fondo azul claro para el resultado */
-            border: 1px solid #b3d7ff; /* Borde azul más claro */
-            border-radius: 8px;
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .result-area {
+            background-color: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 15px;
+            min-height: 100px;
+            margin-top: 15px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            display: none;
+        }
+
+        .result-area.show {
+            display: block;
+        }
+
+        .loading {
             text-align: center;
-            font-size: 1.1em;
-            font-weight: 500;
-            line-height: 1.6; /* Mejora la legibilidad del resultado */
+            color: #667eea;
+            font-style: italic;
         }
-        /* Estilo para los mensajes de error */
-        .error-mensaje {
-            color: #ff3b30; /* Rojo estándar de error en iOS */
-            background-color: #ffebee; /* Fondo rojo muy claro */
-            border: 1px solid #ffcdd2; /* Borde rojo claro */
-            padding: 10px;
+
+        .config-section {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        .config-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 15px;
+        }
+
+        .toggle-config {
+            background-color: #667eea;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            border: none;
+            cursor: pointer;
+        }
+
+        .config-content {
+            display: none;
+        }
+
+        .config-content.show {
+            display: block;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #444;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .save-status {
+            margin-top: 10px;
+            padding: 10px;
             border-radius: 8px;
             text-align: center;
+            font-weight: 500;
+            display: none;
+        }
+
+        .save-status.success {
+            background-color: #d4edda;
+            color: #155724;
+            display: block;
+        }
+
+        .save-status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            display: block;
+        }
+
+        .info-box {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 12px;
+            margin-top: 10px;
+            border-radius: 4px;
             font-size: 0.9em;
-            display: none; /* Oculto por defecto */
+            color: #0d47a1;
+        }
+
+        .btn-copy {
+            background-color: #5ac8fa;
+            color: white;
+            margin-top: 10px;
+        }
+
+        .btn-copy:hover {
+            background-color: #4ab8ea;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(90, 200, 250, 0.4);
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.5em;
+            }
+
+            .button-group {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Calculadora de Carga VE</h1>
+        <h1>✍️ Corrector y Traductor</h1>
+        <p class="subtitle">Corrige y traduce tus textos con IA</p>
 
-        <div id="mensajeError" class="error-mensaje"></div>
-
-        <div>
-            <label for="capacidadBateria">Capacidad total de la batería (kWh):</label>
-            <input type="number" id="capacidadBateria" inputmode="decimal" placeholder="Ej: 77" min="1" step="0.1">
+        <div class="section">
+            <div class="section-title">
+                <span class="icon">📝</span>
+                Texto a procesar
+            </div>
+            <textarea id="inputText" placeholder="Escribe o pega aquí el texto que deseas corregir o traducir..."></textarea>
         </div>
 
-        <div>
-            <label for="porcentajeActual">Porcentaje actual de batería (%):</label>
-            <input type="number" id="porcentajeActual" inputmode="numeric" placeholder="Ej: 20" min="0" max="100" step="1">
+        <div class="button-group">
+            <button class="btn-primary" onclick="corregirTexto()">
+                <span>✓</span> Corregir Ortografía
+            </button>
+            <button class="btn-secondary" onclick="traducir('es-en')">
+                <span>🇺🇸</span> Español → Inglés
+            </button>
+            <button class="btn-tertiary" onclick="traducir('en-es')">
+                <span>🇪🇸</span> Inglés → Español
+            </button>
         </div>
 
-        <div>
-            <label for="porcentajeObjetivo">Porcentaje objetivo de batería (%):</label>
-            <input type="number" id="porcentajeObjetivo" inputmode="numeric" placeholder="Ej: 80" min="0" max="100" step="1">
+        <div class="section">
+            <div class="section-title">
+                <span class="icon">📋</span>
+                Resultado
+            </div>
+            <div id="resultArea" class="result-area"></div>
+            <button id="copyBtn" class="btn-copy" onclick="copiarResultado()" style="display: none;">
+                <span>📋</span> Copiar Resultado
+            </button>
         </div>
 
-        <div>
-            <label for="potenciaCarga">Potencia de carga del punto (kW):</label>
-            <input type="number" id="potenciaCarga" inputmode="decimal" placeholder="Ej: 7.4" min="0.1" step="0.1">
+        <div class="config-section">
+            <div class="config-header">
+                <div class="section-title" style="margin: 0;">
+                    <span class="icon">⚙️</span>
+                    Configuración del Prompt de Corrección
+                </div>
+                <button class="toggle-config" onclick="toggleConfig()">
+                    <span id="toggleIcon">▼</span> Mostrar/Ocultar
+                </button>
+            </div>
+
+            <div id="configContent" class="config-content">
+                <div class="info-box">
+                    💡 Personaliza las instrucciones que se envían a la IA para la corrección ortográfica.
+                    El prompt se guarda automáticamente en tu navegador y se mantiene entre sesiones.
+                </div>
+
+                <div class="input-group">
+                    <label for="apiKey">Clave API de Anthropic (Claude):</label>
+                    <input type="password" id="apiKey" placeholder="sk-ant-...">
+                    <small style="color: #666; display: block; margin-top: 5px;">
+                        Obtén tu clave en: <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a>
+                    </small>
+                </div>
+
+                <div class="input-group">
+                    <label for="customPrompt">Prompt personalizado para corrección:</label>
+                    <textarea id="customPrompt" style="min-height: 120px;" placeholder="Ejemplo: Eres un corrector ortográfico experto. Corrige todos los errores ortográficos, gramaticales y de puntuación del siguiente texto en español. Mantén el mismo tono y estilo del autor. Solo devuelve el texto corregido, sin explicaciones adicionales."></textarea>
+                </div>
+
+                <button class="btn-primary" onclick="guardarConfiguracion()">
+                    <span>💾</span> Guardar Configuración
+                </button>
+
+                <div id="saveStatus" class="save-status"></div>
+            </div>
         </div>
-
-        <button onclick="calcularTiempoCarga()">Calcular Tiempo</button>
-
-        <div id="resultado" style="display: none;"></div>
     </div>
 
     <script>
-        // Referencias a los elementos del DOM
-        const capacidadBateriaEl = document.getElementById('capacidadBateria');
-        const porcentajeActualEl = document.getElementById('porcentajeActual');
-        const porcentajeObjetivoEl = document.getElementById('porcentajeObjetivo');
-        const potenciaCargaEl = document.getElementById('potenciaCarga');
-        const resultadoDiv = document.getElementById('resultado');
-        const mensajeErrorDiv = document.getElementById('mensajeError');
+        const STORAGE_KEYS = {
+            API_KEY: 'claude_api_key',
+            CUSTOM_PROMPT: 'correction_custom_prompt'
+        };
 
-        // Función para mostrar mensajes de error
-        function mostrarError(mensaje) {
-            mensajeErrorDiv.textContent = mensaje;
-            mensajeErrorDiv.style.display = 'block';
-            resultadoDiv.style.display = 'none'; // Ocultar resultados si hay error
+        const DEFAULT_PROMPT = `Eres un corrector ortográfico y gramatical experto en español. Tu tarea es corregir todos los errores ortográficos, gramaticales y de puntuación del siguiente texto. Mantén el mismo tono y estilo del autor. Solo devuelve el texto corregido, sin explicaciones, comentarios ni marcas adicionales.`;
+
+        const TRANSLATION_PROMPTS = {
+            'es-en': 'Traduce el siguiente texto del español al inglés de manera natural y fluida. Solo devuelve la traducción, sin explicaciones adicionales.',
+            'en-es': 'Traduce el siguiente texto del inglés al español de manera natural y fluida. Solo devuelve la traducción, sin explicaciones adicionales.'
+        };
+
+        // Cargar configuración al iniciar
+        window.addEventListener('DOMContentLoaded', function() {
+            cargarConfiguracion();
+        });
+
+        function cargarConfiguracion() {
+            const savedApiKey = localStorage.getItem(STORAGE_KEYS.API_KEY);
+            const savedPrompt = localStorage.getItem(STORAGE_KEYS.CUSTOM_PROMPT);
+
+            if (savedApiKey) {
+                document.getElementById('apiKey').value = savedApiKey;
+            }
+
+            if (savedPrompt) {
+                document.getElementById('customPrompt').value = savedPrompt;
+            } else {
+                document.getElementById('customPrompt').value = DEFAULT_PROMPT;
+            }
         }
 
-        // Función para limpiar mensajes de error
-        function limpiarError() {
-            mensajeErrorDiv.style.display = 'none';
-            mensajeErrorDiv.textContent = '';
+        function guardarConfiguracion() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const customPrompt = document.getElementById('customPrompt').value.trim();
+            const statusDiv = document.getElementById('saveStatus');
+
+            if (!apiKey) {
+                mostrarEstado('error', '⚠️ Por favor, ingresa tu clave API');
+                return;
+            }
+
+            if (!customPrompt) {
+                mostrarEstado('error', '⚠️ El prompt no puede estar vacío');
+                return;
+            }
+
+            try {
+                localStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
+                localStorage.setItem(STORAGE_KEYS.CUSTOM_PROMPT, customPrompt);
+                mostrarEstado('success', '✅ Configuración guardada correctamente');
+            } catch (error) {
+                mostrarEstado('error', '❌ Error al guardar: ' + error.message);
+            }
         }
 
-        // Función principal para calcular el tiempo de carga
-        function calcularTiempoCarga() {
-            limpiarError(); // Limpiar errores previos
+        function mostrarEstado(tipo, mensaje) {
+            const statusDiv = document.getElementById('saveStatus');
+            statusDiv.className = `save-status ${tipo}`;
+            statusDiv.textContent = mensaje;
 
-            // Obtener y convertir los valores de los inputs
-            const capacidadBateria = parseFloat(capacidadBateriaEl.value);
-            const porcentajeActual = parseFloat(porcentajeActualEl.value);
-            const porcentajeObjetivo = parseFloat(porcentajeObjetivoEl.value);
-            const potenciaCarga = parseFloat(potenciaCargaEl.value);
+            setTimeout(() => {
+                statusDiv.className = 'save-status';
+            }, 3000);
+        }
 
-            // --- Validaciones de los datos de entrada ---
-            if (isNaN(capacidadBateria) || capacidadBateria <= 0) {
-                mostrarError("Introduce una capacidad de batería válida (mayor que 0 kWh).");
-                return;
-            }
-            if (isNaN(porcentajeActual) || porcentajeActual < 0 || porcentajeActual > 100) {
-                mostrarError("El porcentaje actual debe estar entre 0 y 100%.");
-                return;
-            }
-            if (isNaN(porcentajeObjetivo) || porcentajeObjetivo < 0 || porcentajeObjetivo > 100) {
-                mostrarError("El porcentaje objetivo debe estar entre 0 y 100%.");
-                return;
-            }
-             if (isNaN(potenciaCarga) || potenciaCarga <= 0) {
-                mostrarError("Introduce una potencia de carga válida (mayor que 0 kW).");
-                return;
-            }
-            if (porcentajeActual >= porcentajeObjetivo) {
-                mostrarError("El porcentaje objetivo debe ser mayor que el porcentaje actual.");
+        function toggleConfig() {
+            const configContent = document.getElementById('configContent');
+            configContent.classList.toggle('show');
+        }
+
+        async function corregirTexto() {
+            const texto = document.getElementById('inputText').value.trim();
+
+            if (!texto) {
+                mostrarResultado('⚠️ Por favor, ingresa un texto para corregir', false);
                 return;
             }
 
-            // --- Cálculo del tiempo de carga ---
-            // Energía necesaria en kWh
-            const kwhNecesarios = (capacidadBateria * (porcentajeObjetivo - porcentajeActual)) / 100;
+            const apiKey = localStorage.getItem(STORAGE_KEYS.API_KEY);
+            if (!apiKey) {
+                mostrarResultado('⚠️ Por favor, configura tu clave API en la sección de Configuración', false);
+                return;
+            }
 
-            // Tiempo total en horas (decimal)
-            const tiempoEnHorasDecimal = kwhNecesarios / potenciaCarga;
+            const customPrompt = localStorage.getItem(STORAGE_KEYS.CUSTOM_PROMPT) || DEFAULT_PROMPT;
 
-            // Convertir a horas y minutos
-            const horas = Math.floor(tiempoEnHorasDecimal);
-            const minutos = Math.round((tiempoEnHorasDecimal - horas) * 60);
+            await procesarConIA(customPrompt, texto);
+        }
 
-            // --- Mostrar el resultado ---
-            resultadoDiv.innerHTML = `Energía a cargar: <strong>${kwhNecesarios.toFixed(2)} kWh</strong><br>
-                                     Tiempo estimado: <strong>${horas} horas y ${minutos} minutos</strong>`;
-            resultadoDiv.style.display = 'block'; // Hacer visible el div de resultado
+        async function traducir(direccion) {
+            const texto = document.getElementById('inputText').value.trim();
+
+            if (!texto) {
+                mostrarResultado('⚠️ Por favor, ingresa un texto para traducir', false);
+                return;
+            }
+
+            const apiKey = localStorage.getItem(STORAGE_KEYS.API_KEY);
+            if (!apiKey) {
+                mostrarResultado('⚠️ Por favor, configura tu clave API en la sección de Configuración', false);
+                return;
+            }
+
+            const prompt = TRANSLATION_PROMPTS[direccion];
+            await procesarConIA(prompt, texto);
+        }
+
+        async function procesarConIA(systemPrompt, userText) {
+            const resultArea = document.getElementById('resultArea');
+            const copyBtn = document.getElementById('copyBtn');
+
+            mostrarResultado('⏳ Procesando...', true);
+            copyBtn.style.display = 'none';
+
+            const apiKey = localStorage.getItem(STORAGE_KEYS.API_KEY);
+
+            try {
+                const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': apiKey,
+                        'anthropic-version': '2023-06-01'
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-3-5-sonnet-20241022',
+                        max_tokens: 4096,
+                        system: systemPrompt,
+                        messages: [
+                            {
+                                role: 'user',
+                                content: userText
+                            }
+                        ]
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`Error de API: ${errorData.error?.message || response.statusText}`);
+                }
+
+                const data = await response.json();
+                const resultado = data.content[0].text;
+
+                mostrarResultado(resultado, true);
+                copyBtn.style.display = 'flex';
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarResultado(`❌ Error al procesar: ${error.message}\n\nVerifica que tu clave API sea correcta y tenga créditos disponibles.`, true);
+            }
+        }
+
+        function mostrarResultado(texto, mostrar) {
+            const resultArea = document.getElementById('resultArea');
+            resultArea.textContent = texto;
+            if (mostrar) {
+                resultArea.classList.add('show');
+            } else {
+                resultArea.classList.remove('show');
+            }
+        }
+
+        async function copiarResultado() {
+            const resultArea = document.getElementById('resultArea');
+            const copyBtn = document.getElementById('copyBtn');
+
+            try {
+                await navigator.clipboard.writeText(resultArea.textContent);
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '<span>✅</span> ¡Copiado!';
+
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                }, 2000);
+            } catch (error) {
+                console.error('Error al copiar:', error);
+                alert('No se pudo copiar el texto');
+            }
         }
     </script>
 </body>
