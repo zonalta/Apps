@@ -113,6 +113,17 @@
     };
   }
 
+  /* Personal de Delegación y Subdelegación del Gobierno: igual que los
+     coordinadores, un importe global que se escribe directamente en
+     Configuración, sin tarifa ni cantidad de por medio. */
+  function calcularGlobalesFijos(estado) {
+    var out = {};
+    App.store.GLOBALES_FIJOS.forEach(function (id) {
+      out[id] = { importe: Number(estado.config[id]) || 0 };
+    });
+    return out;
+  }
+
   /* Aplica los filtros del informe y devuelve los códigos de municipio en ámbito.
      filtros = { provincias: [], islas: [], municipios: [], soloActivos: bool } */
   function municipiosEnAmbito(estado, filtros) {
@@ -198,6 +209,14 @@
     var coordinadores = calcularCoordinadores(estado);
     var incluyeCoordinadores = tipos.indexOf('coordinadores') >= 0;
 
+    /* El resto de conceptos globales: se suman los que estén seleccionados
+       en el informe, cada uno con su propio importe fijo. */
+    var globalesFijos = calcularGlobalesFijos(estado);
+    var totalGlobalesFijos = 0;
+    App.store.GLOBALES_FIJOS.forEach(function (id) {
+      if (tipos.indexOf(id) >= 0) { totalGlobalesFijos += globalesFijos[id].importe; }
+    });
+
     return {
       generadoEn: new Date(),
       filtros: filtros,
@@ -214,14 +233,18 @@
       totalTerritorial: totalGeneral,
       coordinadores: coordinadores,
       incluyeCoordinadores: incluyeCoordinadores,
-      /* Total general: territorial + coordinadores, que van aparte por diseño. */
-      total: totalGeneral + (incluyeCoordinadores ? coordinadores.total : 0)
+      globalesFijos: globalesFijos,
+      totalGlobalesFijos: totalGlobalesFijos,
+      /* Total general: territorial + los conceptos globales seleccionados,
+         que van aparte por diseño. */
+      total: totalGeneral + (incluyeCoordinadores ? coordinadores.total : 0) + totalGlobalesFijos
     };
   }
 
   App.calc = {
     calcularMunicipio: calcularMunicipio,
     calcularCoordinadores: calcularCoordinadores,
+    calcularGlobalesFijos: calcularGlobalesFijos,
     municipiosEnAmbito: municipiosEnAmbito,
     tramoSecretario: tramoSecretario,
     generarInforme: generarInforme
