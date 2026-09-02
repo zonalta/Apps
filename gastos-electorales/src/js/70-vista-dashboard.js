@@ -227,6 +227,9 @@
     App.store.GLOBALES_FIJOS.forEach(function (id) {
       if (informe.tipos.indexOf(id) >= 0) { total += informe.globalesFijos[id].importe; }
     });
+    App.store.GLOBALES_HORAS.forEach(function (id) {
+      if (informe.tipos.indexOf(id) >= 0) { total += informe.globalesHoras[id].importe; }
+    });
     return total;
   }
 
@@ -285,8 +288,8 @@
           ? el('p', {
               class: 'leyenda-nota',
               text: 'Los conceptos de ámbito global (' + euro(totalGlobalIncluido(informe)) +
-                ': coordinadores de tablets, personal de Delegación y Subdelegación del Gobierno) ' +
-                'no aparecen en esta gráfica porque no se reparten por territorio. ' +
+                ': coordinadores de tablets, personal de Delegación y Subdelegación del Gobierno, ' +
+                'Personal Gobierno de Canarias) no aparecen en esta gráfica porque no se reparten por territorio. ' +
                 'Sí están incluidos en el coste total.'
             })
           : null
@@ -399,6 +402,16 @@
                 cantidad: informe.coordinadores.hasta10.cantidad + informe.coordinadores.desde11.cantidad,
                 unidad: 'coordinadores',
                 importe: informe.coordinadores.total,
+                ambito: 'Global (no territorializado)'
+              };
+            }
+            if (informe.globalesHoras[c.id]) {
+              var gh = informe.globalesHoras[c.id];
+              return {
+                nombre: c.nombre,
+                cantidad: gh.horas,
+                unidad: 'horas',
+                importe: gh.importe,
                 ambito: 'Global (no territorializado)'
               };
             }
@@ -711,6 +724,55 @@
     ]);
   }
 
+  /* Personal Gobierno de Canarias: mismo trato que el resto de globales, con
+     horas e importe/hora a la vista además del importe final. */
+  function tarjetaPersonalGobiernoCanarias(informe) {
+    var incluidos = App.store.GLOBALES_HORAS.filter(function (id) { return informe.tipos.indexOf(id) >= 0; });
+    if (!incluidos.length) { return null; }
+
+    var total = incluidos.reduce(function (a, id) { return a + informe.globalesHoras[id].importe; }, 0);
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('escudo'), 'Personal Gobierno de Canarias']),
+        el('span', { class: 'chip aviso', text: 'Importe independiente' })
+      ]),
+      el('p', {
+        class: 'silencio',
+        text: 'No se reparte por municipio, isla ni provincia. Se suma únicamente al coste total del informe.'
+      }),
+      el('div', { class: 'tabla-scroll', style: 'margin-top:16px' }, [
+        el('table', {}, [
+          el('thead', {}, [
+            el('tr', {}, [
+              el('th', { text: 'Concepto' }),
+              el('th', { class: 'n', text: 'Horas' }),
+              el('th', { class: 'n', text: 'Imp./hora' }),
+              el('th', { class: 'n', text: 'Importe' })
+            ])
+          ]),
+          el('tbody', {}, incluidos.map(function (id) {
+            var g = informe.globalesHoras[id];
+            return el('tr', {}, [
+              el('td', { text: App.store.colaborador(id).nombre }),
+              el('td', { class: 'n', text: numero(g.horas) }),
+              el('td', { class: 'n', text: euro(g.importeHora) }),
+              el('td', { class: 'n', style: 'font-weight:600', text: euro(g.importe) })
+            ]);
+          })),
+          el('tfoot', {}, [
+            el('tr', {}, [
+              el('td', { text: 'Total' }),
+              el('td', {}),
+              el('td', {}),
+              el('td', { class: 'n', text: euro(total) })
+            ])
+          ])
+        ])
+      ])
+    ]);
+  }
+
   /* ---------- Cabecera del informe y exportación ---------- */
 
   function resumenAmbito(informe) {
@@ -866,6 +928,7 @@
         graficas(informe),
         tarjetaCoordinadores(informe),
         tarjetaPersonalGobierno(informe),
+        tarjetaPersonalGobiernoCanarias(informe),
         tablaInforme(informe)
       ]);
     }

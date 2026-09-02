@@ -72,6 +72,8 @@ No hay dependencias ni `node_modules`: `build.js` sólo concatena `src/`.
 | Policía Autonómica y Local | Tarifa por efectivo × efectivos del municipio |
 | Miembros de mesas electorales | Tarifa × 3 miembros × mesas del municipio |
 | Coordinadores de tablets | (nº tramo ≤10 × su tarifa) + (nº tramo ≥11 × su tarifa) — **no territorializado** |
+| Personal Delegación / Subdelegación del Gobierno | Importe fijo, uno por convocatoria — **no territorializado** |
+| Personal Gobierno de Canarias (Coordinador, Personal Administrativo, Personal de Apoyo, Coordinador Almacén Las Palmas, Coordinador Almacén Santa Cruz de Tenerife, Personal Papeletas, Personal Centro de Datos) | Horas × precio/hora, cada uno con las suyas — **no territorializado** |
 
 Los cálculos están verificados con una prueba en navegador que recalcula el total
 por una vía independiente y comprueba que la suma por isla, por provincia y por
