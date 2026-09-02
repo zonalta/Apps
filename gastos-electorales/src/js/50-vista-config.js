@@ -31,9 +31,13 @@
       }
     });
 
-    var envoltorio = opciones.sinEuro
-      ? el('div', { class: 'campo-euro sin' }, [input])
-      : el('div', { class: 'campo-euro' }, [input]);
+    /* Sufijo del campo: "€" por defecto, otra unidad si se indica (p. ej.
+       "h."), o ninguno para un recuento sin unidad ("Nº de coordinadores"). */
+    var sufijo = opciones.sufijo != null ? opciones.sufijo : (opciones.sinEuro ? '' : '€');
+    var envoltorio = el('div', {
+      class: 'campo-euro' + (sufijo ? '' : ' sin'),
+      'data-sufijo': sufijo || null
+    }, [input]);
 
     if (opciones.linea) {
       return el('div', { class: 'campo-linea' }, [
@@ -186,7 +190,7 @@
         el('span', { class: 'num', style: 'font-weight:600', text: App.ui.euro(subtotal) })
       ]),
       el('div', { class: 'rejilla dos' }, [
-        campoImporte('Horas', 'config.personalGobiernoCanarias.' + item.id + '.horas', { linea: true, sinEuro: true }),
+        campoImporte('Horas', 'config.personalGobiernoCanarias.' + item.id + '.horas', { linea: true, sufijo: 'h.' }),
         campoImporte('Importe por hora', 'config.personalGobiernoCanarias.' + item.id + '.importeHora', { linea: true })
       ])
     ]);

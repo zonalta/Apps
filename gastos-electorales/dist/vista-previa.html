@@ -179,12 +179,17 @@ input:focus-visible, select:focus-visible, button:focus-visible, .zona-carga:foc
 }
 input[type="number"] { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* El sufijo por defecto es "€"; campoImporte() lo cambia por otra unidad
+   (p. ej. "h.") con el atributo data-sufijo, o lo suprime del todo con la
+   clase "sin" cuando el campo es un recuento sin unidad (nº de personas). */
 .campo-euro { position: relative; }
 .campo-euro input { padding-right: 30px; }
 .campo-euro::after {
-  content: "€"; position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+  content: attr(data-sufijo); position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
   color: var(--muted); pointer-events: none;
 }
+.campo-euro.sin::after { content: none; }
+.campo-euro.sin input { padding-right: 12px; }
 
 .campo { margin-bottom: 0; }
 .campo-linea {
@@ -2474,9 +2479,13 @@ tfoot td {
       }
     });
 
-    var envoltorio = opciones.sinEuro
-      ? el('div', { class: 'campo-euro sin' }, [input])
-      : el('div', { class: 'campo-euro' }, [input]);
+    /* Sufijo del campo: "€" por defecto, otra unidad si se indica (p. ej.
+       "h."), o ninguno para un recuento sin unidad ("Nº de coordinadores"). */
+    var sufijo = opciones.sufijo != null ? opciones.sufijo : (opciones.sinEuro ? '' : '€');
+    var envoltorio = el('div', {
+      class: 'campo-euro' + (sufijo ? '' : ' sin'),
+      'data-sufijo': sufijo || null
+    }, [input]);
 
     if (opciones.linea) {
       return el('div', { class: 'campo-linea' }, [
@@ -2629,7 +2638,7 @@ tfoot td {
         el('span', { class: 'num', style: 'font-weight:600', text: App.ui.euro(subtotal) })
       ]),
       el('div', { class: 'rejilla dos' }, [
-        campoImporte('Horas', 'config.personalGobiernoCanarias.' + item.id + '.horas', { linea: true, sinEuro: true }),
+        campoImporte('Horas', 'config.personalGobiernoCanarias.' + item.id + '.horas', { linea: true, sufijo: 'h.' }),
         campoImporte('Importe por hora', 'config.personalGobiernoCanarias.' + item.id + '.importeHora', { linea: true })
       ])
     ]);
