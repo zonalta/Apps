@@ -150,6 +150,30 @@
     ]);
   }
 
+  function tarjetaPersonalGobierno() {
+    var cfg = App.store.estado().config;
+    var total = (Number(cfg.personalDelegacionGobierno) || 0) + (Number(cfg.personalSubdelegacionGobierno) || 0);
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('edificio'), 'Personal de Delegación y Subdelegación del Gobierno'])
+      ]),
+      el('div', { class: 'aviso' }, [
+        icono('aviso'),
+        el('div', {}, [
+          el('strong', { text: 'Concepto no territorializado. ' }),
+          'Igual que los coordinadores de tablets, cada importe se introduce aquí como un total ya cerrado: ' +
+          'no se reparte entre municipios, islas ni provincias, y sólo entra en el total general.'
+        ])
+      ]),
+      el('div', { class: 'rejilla dos', style: 'margin-top:18px' }, [
+        campoImporte('Personal Delegación del Gobierno', 'config.personalDelegacionGobierno', { linea: true }),
+        campoImporte('Personal Subdelegación del Gobierno', 'config.personalSubdelegacionGobierno', { linea: true })
+      ]),
+      el('p', { class: 'leyenda-nota', text: 'Total: ' + App.ui.euro(total) })
+    ]);
+  }
+
   function tarjetaConvocatoria() {
     var estado = App.store.estado();
     return el('section', { class: 'tarjeta' }, [
@@ -337,6 +361,7 @@
         ]),
         tarjetaFijas(),
         tarjetaCoordinadores(),
+        tarjetaPersonalGobierno(),
         tarjetaUsuarios(),
         tarjetaVersion()
       ]);

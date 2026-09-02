@@ -217,8 +217,22 @@
 
   /* ---------- Indicadores ---------- */
 
+  /* Suma de todo lo que es "de ámbito global" y está seleccionado en el
+     informe: coordinadores de tablets más los importes fijos (personal de
+     Delegación y Subdelegación del Gobierno). Ninguno se reparte por
+     territorio, así que se tratan igual en los sitios donde hay que avisar
+     de que el total general lleva algo más que lo territorial. */
+  function totalGlobalIncluido(informe) {
+    var total = informe.incluyeCoordinadores ? informe.coordinadores.total : 0;
+    App.store.GLOBALES_FIJOS.forEach(function (id) {
+      if (informe.tipos.indexOf(id) >= 0) { total += informe.globalesFijos[id].importe; }
+    });
+    return total;
+  }
+
   function kpis(informe) {
     var costeMesa = informe.totalMesas ? informe.totalTerritorial / informe.totalMesas : 0;
+    var global = totalGlobalIncluido(informe);
 
     function tarjeta(etiqueta, valor, nota, destacado) {
       return el('div', { class: 'tarjeta kpi' }, [
@@ -230,9 +244,9 @@
 
     return el('div', { class: 'rejilla cuatro' }, [
       tarjeta('Coste total', App.ui.euroCorto(informe.total),
-        informe.incluyeCoordinadores
-          ? 'Incluye ' + euro(informe.coordinadores.total) + ' de coordinadores'
-          : 'Coordinadores no incluidos en la selección',
+        global > 0
+          ? 'Incluye ' + euro(global) + ' en conceptos globales'
+          : 'Conceptos globales no incluidos en la selección',
         true),
       tarjeta('Mesas electorales', numero(informe.totalMesas),
         informe.totalMesas ? euro(costeMesa) + ' por mesa' : 'Sin mesas cargadas'),
@@ -267,11 +281,12 @@
           el('span', { class: 'silencio', text: 'Total repartible: ' + euro(informe.totalTerritorial) })
         ]),
         App.ui.barras(porTipo),
-        informe.incluyeCoordinadores && informe.coordinadores.total > 0
+        totalGlobalIncluido(informe) > 0
           ? el('p', {
               class: 'leyenda-nota',
-              text: 'Los coordinadores de tablets (' + euro(informe.coordinadores.total) +
-                ') no aparecen en esta gráfica porque no se reparten por territorio. ' +
+              text: 'Los conceptos de ámbito global (' + euro(totalGlobalIncluido(informe)) +
+                ': coordinadores de tablets, personal de Delegación y Subdelegación del Gobierno) ' +
+                'no aparecen en esta gráfica porque no se reparten por territorio. ' +
                 'Sí están incluidos en el coste total.'
             })
           : null
@@ -378,11 +393,22 @@
         .filter(function (c) { return coincide(c.nombre); })
         .map(function (c) {
           if (!c.agregable) {
+            if (c.id === 'coordinadores') {
+              return {
+                nombre: c.nombre,
+                cantidad: informe.coordinadores.hasta10.cantidad + informe.coordinadores.desde11.cantidad,
+                unidad: 'coordinadores',
+                importe: informe.coordinadores.total,
+                ambito: 'Global (no territorializado)'
+              };
+            }
+            /* Personal de Delegación/Subdelegación: un importe fijo, sin
+               cantidad ni unidad que mostrar. */
             return {
               nombre: c.nombre,
-              cantidad: informe.coordinadores.hasta10.cantidad + informe.coordinadores.desde11.cantidad,
-              unidad: 'coordinadores',
-              importe: informe.coordinadores.total,
+              cantidad: '',
+              unidad: '',
+              importe: informe.globalesFijos[c.id] ? informe.globalesFijos[c.id].importe : 0,
               ambito: 'Global (no territorializado)'
             };
           }
@@ -643,6 +669,48 @@
     ]);
   }
 
+  /* Personal de Delegación y Subdelegación del Gobierno: mismo tratamiento que
+     los coordinadores — importe global, fuera del reparto territorial. */
+  function tarjetaPersonalGobierno(informe) {
+    var incluidos = App.store.GLOBALES_FIJOS.filter(function (id) { return informe.tipos.indexOf(id) >= 0; });
+    if (!incluidos.length) { return null; }
+
+    var total = incluidos.reduce(function (a, id) { return a + informe.globalesFijos[id].importe; }, 0);
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('edificio'), 'Personal de Delegación y Subdelegación del Gobierno']),
+        el('span', { class: 'chip aviso', text: 'Importe independiente' })
+      ]),
+      el('p', {
+        class: 'silencio',
+        text: 'No se reparte por municipio, isla ni provincia. Se suma únicamente al coste total del informe.'
+      }),
+      el('div', { class: 'tabla-scroll', style: 'margin-top:16px' }, [
+        el('table', {}, [
+          el('thead', {}, [
+            el('tr', {}, [
+              el('th', { text: 'Concepto' }),
+              el('th', { class: 'n', text: 'Importe' })
+            ])
+          ]),
+          el('tbody', {}, incluidos.map(function (id) {
+            return el('tr', {}, [
+              el('td', { text: App.store.colaborador(id).nombre }),
+              el('td', { class: 'n', style: 'font-weight:600', text: euro(informe.globalesFijos[id].importe) })
+            ]);
+          })),
+          el('tfoot', {}, [
+            el('tr', {}, [
+              el('td', { text: 'Total' }),
+              el('td', { class: 'n', text: euro(total) })
+            ])
+          ])
+        ])
+      ])
+    ]);
+  }
+
   /* ---------- Cabecera del informe y exportación ---------- */
 
   function resumenAmbito(informe) {
@@ -797,6 +865,7 @@
         kpis(informe),
         graficas(informe),
         tarjetaCoordinadores(informe),
+        tarjetaPersonalGobierno(informe),
         tablaInforme(informe)
       ]);
     }

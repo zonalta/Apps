@@ -22,8 +22,17 @@
     { id: 'montajeTransporte', nombre: 'Montaje y transporte', agregable: true },
     { id: 'policia', nombre: 'Policía Autonómica y Local', agregable: true },
     { id: 'miembrosMesa', nombre: 'Miembros de mesas electorales', agregable: true },
-    { id: 'coordinadores', nombre: 'Coordinadores de tablets', agregable: false }
+    { id: 'coordinadores', nombre: 'Coordinadores de tablets', agregable: false },
+    { id: 'personalDelegacionGobierno', nombre: 'Personal Delegación del Gobierno', agregable: false },
+    { id: 'personalSubdelegacionGobierno', nombre: 'Personal Subdelegación del Gobierno', agregable: false }
   ];
+
+  /* Los conceptos de esta lista no se calculan (tarifa × cantidad): su importe
+     total se escribe directamente en Configuración, un único número por
+     convocatoria. Igual que los coordinadores, son de ámbito global — no se
+     reparten por municipio, isla ni provincia, y sólo entran en el total
+     general cuando su tipología está seleccionada en el informe. */
+  var GLOBALES_FIJOS = ['personalDelegacionGobierno', 'personalSubdelegacionGobierno'];
 
   var TIPOLOGIAS_PD = ['PD0', 'PD1', 'PD2', 'PD3', 'PD4', 'PD5'];
 
@@ -40,7 +49,9 @@
       /* Miembros por mesa. El briefing fija 3; se deja configurable porque es
          el tipo de constante que cambia entre convocatorias. */
       miembrosPorMesa: 3,
-      coordinadores: { tarifaHasta10: 120, tarifaDesde11: 140, numHasta10: 0, numDesde11: 0 }
+      coordinadores: { tarifaHasta10: 120, tarifaDesde11: 140, numHasta10: 0, numDesde11: 0 },
+      personalDelegacionGobierno: 0,
+      personalSubdelegacionGobierno: 0
     };
   }
 
@@ -215,6 +226,7 @@
   App.store = {
     COLABORADORES: COLABORADORES,
     TIPOLOGIAS_PD: TIPOLOGIAS_PD,
+    GLOBALES_FIJOS: GLOBALES_FIJOS,
     colaborador: function (id) {
       for (var i = 0; i < COLABORADORES.length; i++) {
         if (COLABORADORES[i].id === id) { return COLABORADORES[i]; }
