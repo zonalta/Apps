@@ -124,6 +124,20 @@
     return out;
   }
 
+  /* Personal Gobierno de Canarias: también global, pero cada concepto sale de
+     horas × precio/hora en vez de escribirse ya calculado. */
+  function calcularGlobalesHoras(estado) {
+    var out = {};
+    var cfg = (estado.config.personalGobiernoCanarias) || {};
+    App.store.GLOBALES_HORAS.forEach(function (id) {
+      var g = cfg[id] || {};
+      var horas = Number(g.horas) || 0;
+      var importeHora = Number(g.importeHora) || 0;
+      out[id] = { horas: horas, importeHora: importeHora, importe: horas * importeHora };
+    });
+    return out;
+  }
+
   /* Aplica los filtros del informe y devuelve los códigos de municipio en ámbito.
      filtros = { provincias: [], islas: [], municipios: [], soloActivos: bool } */
   function municipiosEnAmbito(estado, filtros) {
@@ -217,6 +231,14 @@
       if (tipos.indexOf(id) >= 0) { totalGlobalesFijos += globalesFijos[id].importe; }
     });
 
+    /* Personal Gobierno de Canarias: mismo trato, pero el importe de cada uno
+       sale de horas × precio/hora. */
+    var globalesHoras = calcularGlobalesHoras(estado);
+    var totalGlobalesHoras = 0;
+    App.store.GLOBALES_HORAS.forEach(function (id) {
+      if (tipos.indexOf(id) >= 0) { totalGlobalesHoras += globalesHoras[id].importe; }
+    });
+
     return {
       generadoEn: new Date(),
       filtros: filtros,
@@ -235,9 +257,12 @@
       incluyeCoordinadores: incluyeCoordinadores,
       globalesFijos: globalesFijos,
       totalGlobalesFijos: totalGlobalesFijos,
+      globalesHoras: globalesHoras,
+      totalGlobalesHoras: totalGlobalesHoras,
       /* Total general: territorial + los conceptos globales seleccionados,
          que van aparte por diseño. */
-      total: totalGeneral + (incluyeCoordinadores ? coordinadores.total : 0) + totalGlobalesFijos
+      total: totalGeneral + (incluyeCoordinadores ? coordinadores.total : 0) +
+        totalGlobalesFijos + totalGlobalesHoras
     };
   }
 
@@ -245,6 +270,7 @@
     calcularMunicipio: calcularMunicipio,
     calcularCoordinadores: calcularCoordinadores,
     calcularGlobalesFijos: calcularGlobalesFijos,
+    calcularGlobalesHoras: calcularGlobalesHoras,
     municipiosEnAmbito: municipiosEnAmbito,
     tramoSecretario: tramoSecretario,
     generarInforme: generarInforme

@@ -13,6 +13,18 @@
   /* Tipologías de colaborador. El orden manda en la UI y en los informes.
      `agregable: false` marca los conceptos que, por decisión de negocio, no se
      suman al reparto territorial. */
+  /* Personal Gobierno de Canarias: un grupo de conceptos globales cuyo importe
+     sale de horas × precio/hora, cada uno con sus propias horas y tarifa. */
+  var PERSONAL_GOBIERNO_CANARIAS = [
+    { id: 'pgcCoordinador', nombre: 'Coordinador' },
+    { id: 'pgcAdministrativo', nombre: 'Personal Administrativo' },
+    { id: 'pgcApoyo', nombre: 'Personal de Apoyo' },
+    { id: 'pgcAlmacenLasPalmas', nombre: 'Coordinador Almacén Las Palmas' },
+    { id: 'pgcAlmacenTenerife', nombre: 'Coordinador Almacén Santa Cruz de Tenerife' },
+    { id: 'pgcPapeletas', nombre: 'Personal Papeletas' },
+    { id: 'pgcCentroDatos', nombre: 'Personal Centro de Datos' }
+  ];
+
   var COLABORADORES = [
     { id: 'representantes', nombre: 'Representantes de la Administración', agregable: true },
     { id: 'secretarios', nombre: 'Secretarios de Ayuntamiento', agregable: true },
@@ -25,7 +37,9 @@
     { id: 'coordinadores', nombre: 'Coordinadores de tablets', agregable: false },
     { id: 'personalDelegacionGobierno', nombre: 'Personal Delegación del Gobierno', agregable: false },
     { id: 'personalSubdelegacionGobierno', nombre: 'Personal Subdelegación del Gobierno', agregable: false }
-  ];
+  ].concat(PERSONAL_GOBIERNO_CANARIAS.map(function (p) {
+    return { id: p.id, nombre: p.nombre, agregable: false };
+  }));
 
   /* Los conceptos de esta lista no se calculan (tarifa × cantidad): su importe
      total se escribe directamente en Configuración, un único número por
@@ -34,9 +48,18 @@
      general cuando su tipología está seleccionada en el informe. */
   var GLOBALES_FIJOS = ['personalDelegacionGobierno', 'personalSubdelegacionGobierno'];
 
+  /* Estos otros también son globales, pero su importe sale de horas ×
+     precio/hora en vez de escribirse directo. */
+  var GLOBALES_HORAS = PERSONAL_GOBIERNO_CANARIAS.map(function (p) { return p.id; });
+
   var TIPOLOGIAS_PD = ['PD0', 'PD1', 'PD2', 'PD3', 'PD4', 'PD5'];
 
   function configPorDefecto() {
+    var personalGobiernoCanarias = {};
+    GLOBALES_HORAS.forEach(function (id) {
+      personalGobiernoCanarias[id] = { horas: 0, importeHora: 0 };
+    });
+
     return {
       representantes: { PD0: 130, PD1: 170, PD2: 190, PD3: 210, PD4: 230, PD5: 250 },
       secretarios: { hasta10: 100, de11a50: 180, mas50: 250 },
@@ -51,7 +74,8 @@
       miembrosPorMesa: 3,
       coordinadores: { tarifaHasta10: 120, tarifaDesde11: 140, numHasta10: 0, numDesde11: 0 },
       personalDelegacionGobierno: 0,
-      personalSubdelegacionGobierno: 0
+      personalSubdelegacionGobierno: 0,
+      personalGobiernoCanarias: personalGobiernoCanarias
     };
   }
 
@@ -227,6 +251,8 @@
     COLABORADORES: COLABORADORES,
     TIPOLOGIAS_PD: TIPOLOGIAS_PD,
     GLOBALES_FIJOS: GLOBALES_FIJOS,
+    GLOBALES_HORAS: GLOBALES_HORAS,
+    PERSONAL_GOBIERNO_CANARIAS: PERSONAL_GOBIERNO_CANARIAS,
     colaborador: function (id) {
       for (var i = 0; i < COLABORADORES.length; i++) {
         if (COLABORADORES[i].id === id) { return COLABORADORES[i]; }

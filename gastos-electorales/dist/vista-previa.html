@@ -1090,6 +1090,18 @@ tfoot td {
   /* Tipologías de colaborador. El orden manda en la UI y en los informes.
      `agregable: false` marca los conceptos que, por decisión de negocio, no se
      suman al reparto territorial. */
+  /* Personal Gobierno de Canarias: un grupo de conceptos globales cuyo importe
+     sale de horas × precio/hora, cada uno con sus propias horas y tarifa. */
+  var PERSONAL_GOBIERNO_CANARIAS = [
+    { id: 'pgcCoordinador', nombre: 'Coordinador' },
+    { id: 'pgcAdministrativo', nombre: 'Personal Administrativo' },
+    { id: 'pgcApoyo', nombre: 'Personal de Apoyo' },
+    { id: 'pgcAlmacenLasPalmas', nombre: 'Coordinador Almacén Las Palmas' },
+    { id: 'pgcAlmacenTenerife', nombre: 'Coordinador Almacén Santa Cruz de Tenerife' },
+    { id: 'pgcPapeletas', nombre: 'Personal Papeletas' },
+    { id: 'pgcCentroDatos', nombre: 'Personal Centro de Datos' }
+  ];
+
   var COLABORADORES = [
     { id: 'representantes', nombre: 'Representantes de la Administración', agregable: true },
     { id: 'secretarios', nombre: 'Secretarios de Ayuntamiento', agregable: true },
@@ -1102,7 +1114,9 @@ tfoot td {
     { id: 'coordinadores', nombre: 'Coordinadores de tablets', agregable: false },
     { id: 'personalDelegacionGobierno', nombre: 'Personal Delegación del Gobierno', agregable: false },
     { id: 'personalSubdelegacionGobierno', nombre: 'Personal Subdelegación del Gobierno', agregable: false }
-  ];
+  ].concat(PERSONAL_GOBIERNO_CANARIAS.map(function (p) {
+    return { id: p.id, nombre: p.nombre, agregable: false };
+  }));
 
   /* Los conceptos de esta lista no se calculan (tarifa × cantidad): su importe
      total se escribe directamente en Configuración, un único número por
@@ -1111,9 +1125,18 @@ tfoot td {
      general cuando su tipología está seleccionada en el informe. */
   var GLOBALES_FIJOS = ['personalDelegacionGobierno', 'personalSubdelegacionGobierno'];
 
+  /* Estos otros también son globales, pero su importe sale de horas ×
+     precio/hora en vez de escribirse directo. */
+  var GLOBALES_HORAS = PERSONAL_GOBIERNO_CANARIAS.map(function (p) { return p.id; });
+
   var TIPOLOGIAS_PD = ['PD0', 'PD1', 'PD2', 'PD3', 'PD4', 'PD5'];
 
   function configPorDefecto() {
+    var personalGobiernoCanarias = {};
+    GLOBALES_HORAS.forEach(function (id) {
+      personalGobiernoCanarias[id] = { horas: 0, importeHora: 0 };
+    });
+
     return {
       representantes: { PD0: 130, PD1: 170, PD2: 190, PD3: 210, PD4: 230, PD5: 250 },
       secretarios: { hasta10: 100, de11a50: 180, mas50: 250 },
@@ -1128,7 +1151,8 @@ tfoot td {
       miembrosPorMesa: 3,
       coordinadores: { tarifaHasta10: 120, tarifaDesde11: 140, numHasta10: 0, numDesde11: 0 },
       personalDelegacionGobierno: 0,
-      personalSubdelegacionGobierno: 0
+      personalSubdelegacionGobierno: 0,
+      personalGobiernoCanarias: personalGobiernoCanarias
     };
   }
 
@@ -1304,6 +1328,8 @@ tfoot td {
     COLABORADORES: COLABORADORES,
     TIPOLOGIAS_PD: TIPOLOGIAS_PD,
     GLOBALES_FIJOS: GLOBALES_FIJOS,
+    GLOBALES_HORAS: GLOBALES_HORAS,
+    PERSONAL_GOBIERNO_CANARIAS: PERSONAL_GOBIERNO_CANARIAS,
     colaborador: function (id) {
       for (var i = 0; i < COLABORADORES.length; i++) {
         if (COLABORADORES[i].id === id) { return COLABORADORES[i]; }
@@ -1963,6 +1989,20 @@ tfoot td {
     return out;
   }
 
+  /* Personal Gobierno de Canarias: también global, pero cada concepto sale de
+     horas × precio/hora en vez de escribirse ya calculado. */
+  function calcularGlobalesHoras(estado) {
+    var out = {};
+    var cfg = (estado.config.personalGobiernoCanarias) || {};
+    App.store.GLOBALES_HORAS.forEach(function (id) {
+      var g = cfg[id] || {};
+      var horas = Number(g.horas) || 0;
+      var importeHora = Number(g.importeHora) || 0;
+      out[id] = { horas: horas, importeHora: importeHora, importe: horas * importeHora };
+    });
+    return out;
+  }
+
   /* Aplica los filtros del informe y devuelve los códigos de municipio en ámbito.
      filtros = { provincias: [], islas: [], municipios: [], soloActivos: bool } */
   function municipiosEnAmbito(estado, filtros) {
@@ -2056,6 +2096,14 @@ tfoot td {
       if (tipos.indexOf(id) >= 0) { totalGlobalesFijos += globalesFijos[id].importe; }
     });
 
+    /* Personal Gobierno de Canarias: mismo trato, pero el importe de cada uno
+       sale de horas × precio/hora. */
+    var globalesHoras = calcularGlobalesHoras(estado);
+    var totalGlobalesHoras = 0;
+    App.store.GLOBALES_HORAS.forEach(function (id) {
+      if (tipos.indexOf(id) >= 0) { totalGlobalesHoras += globalesHoras[id].importe; }
+    });
+
     return {
       generadoEn: new Date(),
       filtros: filtros,
@@ -2074,9 +2122,12 @@ tfoot td {
       incluyeCoordinadores: incluyeCoordinadores,
       globalesFijos: globalesFijos,
       totalGlobalesFijos: totalGlobalesFijos,
+      globalesHoras: globalesHoras,
+      totalGlobalesHoras: totalGlobalesHoras,
       /* Total general: territorial + los conceptos globales seleccionados,
          que van aparte por diseño. */
-      total: totalGeneral + (incluyeCoordinadores ? coordinadores.total : 0) + totalGlobalesFijos
+      total: totalGeneral + (incluyeCoordinadores ? coordinadores.total : 0) +
+        totalGlobalesFijos + totalGlobalesHoras
     };
   }
 
@@ -2084,6 +2135,7 @@ tfoot td {
     calcularMunicipio: calcularMunicipio,
     calcularCoordinadores: calcularCoordinadores,
     calcularGlobalesFijos: calcularGlobalesFijos,
+    calcularGlobalesHoras: calcularGlobalesHoras,
     municipiosEnAmbito: municipiosEnAmbito,
     tramoSecretario: tramoSecretario,
     generarInforme: generarInforme
@@ -2565,6 +2617,51 @@ tfoot td {
     ]);
   }
 
+  /* Una fila de Personal Gobierno de Canarias: horas × precio/hora, con el
+     resultado a la vista junto al nombre. */
+  function filaPersonalGobiernoCanarias(item) {
+    var g = App.store.estado().config.personalGobiernoCanarias[item.id];
+    var subtotal = (Number(g.horas) || 0) * (Number(g.importeHora) || 0);
+
+    return el('div', { class: 'apilar junto', style: 'padding-bottom:16px;border-bottom:1px solid var(--gridline)' }, [
+      el('div', { class: 'entre' }, [
+        el('strong', { style: 'font-size:13px', text: item.nombre }),
+        el('span', { class: 'num', style: 'font-weight:600', text: App.ui.euro(subtotal) })
+      ]),
+      el('div', { class: 'rejilla dos' }, [
+        campoImporte('Horas', 'config.personalGobiernoCanarias.' + item.id + '.horas', { linea: true, sinEuro: true }),
+        campoImporte('Importe por hora', 'config.personalGobiernoCanarias.' + item.id + '.importeHora', { linea: true })
+      ])
+    ]);
+  }
+
+  function tarjetaPersonalGobiernoCanarias() {
+    var cfg = App.store.estado().config.personalGobiernoCanarias;
+    var total = App.store.PERSONAL_GOBIERNO_CANARIAS.reduce(function (a, item) {
+      var g = cfg[item.id];
+      return a + (Number(g.horas) || 0) * (Number(g.importeHora) || 0);
+    }, 0);
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('escudo'), 'Personal Gobierno de Canarias'])
+      ]),
+      el('div', { class: 'aviso' }, [
+        icono('aviso'),
+        el('div', {}, [
+          el('strong', { text: 'Concepto no territorializado. ' }),
+          'El importe de cada uno sale de multiplicar sus horas por el precio de la hora. No se reparte entre ' +
+          'municipios, islas ni provincias, y cada uno sólo entra en el total general si su tipología está ' +
+          'seleccionada en el informe.'
+        ])
+      ]),
+      el('div', { class: 'apilar', style: 'gap:16px;margin-top:18px' },
+        App.store.PERSONAL_GOBIERNO_CANARIAS.map(filaPersonalGobiernoCanarias)
+      ),
+      el('p', { class: 'leyenda-nota', text: 'Total Personal Gobierno de Canarias: ' + App.ui.euro(total) })
+    ]);
+  }
+
   function tarjetaConvocatoria() {
     var estado = App.store.estado();
     return el('section', { class: 'tarjeta' }, [
@@ -2753,6 +2850,7 @@ tfoot td {
         tarjetaFijas(),
         tarjetaCoordinadores(),
         tarjetaPersonalGobierno(),
+        tarjetaPersonalGobiernoCanarias(),
         tarjetaUsuarios(),
         tarjetaVersion()
       ]);
@@ -3627,6 +3725,9 @@ tfoot td {
     App.store.GLOBALES_FIJOS.forEach(function (id) {
       if (informe.tipos.indexOf(id) >= 0) { total += informe.globalesFijos[id].importe; }
     });
+    App.store.GLOBALES_HORAS.forEach(function (id) {
+      if (informe.tipos.indexOf(id) >= 0) { total += informe.globalesHoras[id].importe; }
+    });
     return total;
   }
 
@@ -3685,8 +3786,8 @@ tfoot td {
           ? el('p', {
               class: 'leyenda-nota',
               text: 'Los conceptos de ámbito global (' + euro(totalGlobalIncluido(informe)) +
-                ': coordinadores de tablets, personal de Delegación y Subdelegación del Gobierno) ' +
-                'no aparecen en esta gráfica porque no se reparten por territorio. ' +
+                ': coordinadores de tablets, personal de Delegación y Subdelegación del Gobierno, ' +
+                'Personal Gobierno de Canarias) no aparecen en esta gráfica porque no se reparten por territorio. ' +
                 'Sí están incluidos en el coste total.'
             })
           : null
@@ -3799,6 +3900,16 @@ tfoot td {
                 cantidad: informe.coordinadores.hasta10.cantidad + informe.coordinadores.desde11.cantidad,
                 unidad: 'coordinadores',
                 importe: informe.coordinadores.total,
+                ambito: 'Global (no territorializado)'
+              };
+            }
+            if (informe.globalesHoras[c.id]) {
+              var gh = informe.globalesHoras[c.id];
+              return {
+                nombre: c.nombre,
+                cantidad: gh.horas,
+                unidad: 'horas',
+                importe: gh.importe,
                 ambito: 'Global (no territorializado)'
               };
             }
@@ -4111,6 +4222,55 @@ tfoot td {
     ]);
   }
 
+  /* Personal Gobierno de Canarias: mismo trato que el resto de globales, con
+     horas e importe/hora a la vista además del importe final. */
+  function tarjetaPersonalGobiernoCanarias(informe) {
+    var incluidos = App.store.GLOBALES_HORAS.filter(function (id) { return informe.tipos.indexOf(id) >= 0; });
+    if (!incluidos.length) { return null; }
+
+    var total = incluidos.reduce(function (a, id) { return a + informe.globalesHoras[id].importe; }, 0);
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', {}, [icono('escudo'), 'Personal Gobierno de Canarias']),
+        el('span', { class: 'chip aviso', text: 'Importe independiente' })
+      ]),
+      el('p', {
+        class: 'silencio',
+        text: 'No se reparte por municipio, isla ni provincia. Se suma únicamente al coste total del informe.'
+      }),
+      el('div', { class: 'tabla-scroll', style: 'margin-top:16px' }, [
+        el('table', {}, [
+          el('thead', {}, [
+            el('tr', {}, [
+              el('th', { text: 'Concepto' }),
+              el('th', { class: 'n', text: 'Horas' }),
+              el('th', { class: 'n', text: 'Imp./hora' }),
+              el('th', { class: 'n', text: 'Importe' })
+            ])
+          ]),
+          el('tbody', {}, incluidos.map(function (id) {
+            var g = informe.globalesHoras[id];
+            return el('tr', {}, [
+              el('td', { text: App.store.colaborador(id).nombre }),
+              el('td', { class: 'n', text: numero(g.horas) }),
+              el('td', { class: 'n', text: euro(g.importeHora) }),
+              el('td', { class: 'n', style: 'font-weight:600', text: euro(g.importe) })
+            ]);
+          })),
+          el('tfoot', {}, [
+            el('tr', {}, [
+              el('td', { text: 'Total' }),
+              el('td', {}),
+              el('td', {}),
+              el('td', { class: 'n', text: euro(total) })
+            ])
+          ])
+        ])
+      ])
+    ]);
+  }
+
   /* ---------- Cabecera del informe y exportación ---------- */
 
   function resumenAmbito(informe) {
@@ -4266,6 +4426,7 @@ tfoot td {
         graficas(informe),
         tarjetaCoordinadores(informe),
         tarjetaPersonalGobierno(informe),
+        tarjetaPersonalGobiernoCanarias(informe),
         tablaInforme(informe)
       ]);
     }
