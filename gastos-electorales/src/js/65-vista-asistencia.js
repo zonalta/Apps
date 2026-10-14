@@ -36,6 +36,7 @@
     var input = el('input', {
       type: 'number', min: '0', step: paso || '0.01',
       value: obj[clave],
+      style: sufijo && sufijo.length > 2 ? 'padding-right:56px' : null,
       'aria-label': clave + ' — ' + ambito.nombre,
       onInput: function (e) {
         var v = parseFloat(e.target.value);
@@ -149,10 +150,10 @@
   function tarjetaSesiones() {
     var ambitos = App.store.estado().asistencia.ambitos;
     return el('section', { class: 'tarjeta' }, [
-      el('header', {}, [el('h2', {}, [icono('mesa'), 'Máximo de sesiones por fase'])]),
+      el('header', {}, [el('h2', {}, [icono('mesa'), 'Máximo de asistencias por fase'])]),
       el('p', {
         class: 'silencio',
-        text: 'Número máximo de sesiones de asistencia que puede realizar cada ámbito en cada fase. Los ámbitos se gestionan en el bloque de arriba.'
+        text: 'Número máximo de asistencias que puede realizar cada ámbito en cada fase. Los ámbitos se gestionan en el bloque de arriba.'
       }),
       ambitos.length
         ? el('div', { class: 'tabla-scroll', style: 'margin-top:16px' }, [
@@ -163,7 +164,7 @@
               el('tbody', {}, ambitos.map(function (a) {
                 return el('tr', {}, [
                   el('td', { style: 'white-space:normal;min-width:200px;width:30%', text: a.nombre || '(ámbito sin nombre)' })
-                ].concat(FASES.map(function (f) { return celdaNumero(a, f.id, 'ses.', '1', true); })));
+                ].concat(FASES.map(function (f) { return celdaNumero(a, f.id, 'asist.', '1', true); })));
               }))
             ])
           ])
@@ -302,7 +303,7 @@
     ]);
   }
 
-  /* Asistencias frente al máximo de sesiones configurado. Sin máximo (0) no se
+  /* Asistencias frente al máximo de asistencias configurado. Sin máximo (0) no se
      juzga: se muestra el dato sin barra. Por encima del máximo se marca en rojo. */
   function ocupacion(ambitos) {
     function celda(ambito, fase) {
@@ -336,7 +337,7 @@
 
     return el('section', { class: 'tarjeta' }, [
       el('header', {}, [
-        el('h2', { text: 'Asistencias frente al máximo de sesiones' }),
+        el('h2', { text: 'Asistencias frente al máximo' }),
         excesos
           ? el('span', { class: 'chip', style: 'background:var(--error-container);color:var(--error)', text: excesos + (excesos === 1 ? ' fase supera' : ' fases superan') + ' su máximo' })
           : el('span', { class: 'chip ok', text: 'Todo dentro de los máximos' })
