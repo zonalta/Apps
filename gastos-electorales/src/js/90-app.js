@@ -5,10 +5,24 @@
   var el = App.ui.el;
   var icono = App.ui.icono;
 
-  var VISTAS = [
-    { id: 'dashboard', nombre: 'Dashboard de Informes', icono: 'dashboard' },
-    { id: 'configuracion', nombre: 'Configuración de Importes', icono: 'ajustes' },
-    { id: 'datos', nombre: 'Carga de Datos', icono: 'carga' }
+  /* Cada módulo es un bloque de la aplicación con sus propias pantallas.
+     Se cambia de uno a otro desde el selector de la barra lateral. */
+  var MODULOS = [
+    {
+      id: 'gastos', nombre: 'Administración de gastos',
+      vistas: [
+        { id: 'dashboard', nombre: 'Dashboard de Informes', icono: 'dashboard' },
+        { id: 'configuracion', nombre: 'Configuración de Importes', icono: 'ajustes' },
+        { id: 'datos', nombre: 'Carga de Datos', icono: 'carga' }
+      ]
+    },
+    {
+      id: 'asistencia', nombre: 'Importe por asistencia',
+      vistas: [
+        { id: 'asistencia-dashboard', nombre: 'Dashboard de Asistencia', icono: 'dashboard' },
+        { id: 'asistencia-config', nombre: 'Configuración de Asistencia', icono: 'ajustes' }
+      ]
+    }
   ];
 
   var actual = 'dashboard';
@@ -30,16 +44,43 @@
      Datos aparecen en el menú. Es sólo la parte visible de la restricción —
      el servidor rechaza igualmente cualquier guardado que viniera de una
      sesión de consulta aunque llegase por otro camino. */
+  function moduloDe(vistaId) {
+    return MODULOS.filter(function (m) {
+      return m.vistas.some(function (v) { return v.id === vistaId; });
+    })[0] || MODULOS[0];
+  }
+
+  /* Una cuenta de consulta no cambia de módulo: se queda en el Dashboard. */
+  function modulosVisibles() {
+    return App.sesion.esConsulta() ? [MODULOS[0]] : MODULOS;
+  }
+
   function vistasVisibles() {
-    if (!App.sesion.esConsulta()) { return VISTAS; }
-    return VISTAS.filter(function (v) { return v.id === 'dashboard'; });
+    var vistas = moduloDe(actual).vistas;
+    if (!App.sesion.esConsulta()) { return vistas; }
+    return vistas.filter(function (v) { return v.id === 'dashboard'; });
+  }
+
+  function selectorModulo() {
+    var modulos = modulosVisibles();
+    var actualModulo = moduloDe(actual);
+    if (modulos.length < 2) {
+      return el('div', { class: 'marca-sub', text: actualModulo.nombre });
+    }
+    return el('select', {
+      class: 'selector-modulo',
+      'aria-label': 'Módulo',
+      onChange: function (e) { App.irA(MODULOS.filter(function (m) { return m.id === e.target.value; })[0].vistas[0].id); }
+    }, modulos.map(function (m) {
+      return el('option', { value: m.id, selected: m.id === actualModulo.id, text: m.nombre });
+    }));
   }
 
   function barraLateral() {
     return el('nav', { class: 'sidebar no-imprimir', 'aria-label': 'Navegación principal' }, [
       el('div', {}, [
         el('div', { class: 'marca-titulo', text: 'Gestión Electoral' }),
-        el('div', { class: 'marca-sub', text: 'Administración de gastos' })
+        selectorModulo()
       ]),
       el('div', { class: 'nav' }, vistasVisibles().map(function (v) {
         return el('button', {
@@ -129,6 +170,7 @@
        da igual por dónde se intente llegar (un enlace de otra vista, por
        ejemplo). */
     actual = (App.sesion.esConsulta() && id !== 'dashboard') ? 'dashboard' : id;
+    if (!App.vistas[actual]) { actual = 'dashboard'; }
     menuAbierto = false;
     App.render();
     window.scrollTo(0, 0);
