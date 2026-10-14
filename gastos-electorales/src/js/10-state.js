@@ -95,7 +95,7 @@
   function asistenciaPorDefecto() {
     return {
       ambitos: AMBITOS_ASISTENCIA.map(function (nombre, i) {
-        return { id: 'a' + (i + 1), nombre: nombre, horasMax: 0, importeHora: 0, unidades: 0 };
+        return { id: 'a' + (i + 1), nombre: nombre, horasMax: 0, importeHora: 0, unidades: 0, maxSesiones: { previa: 0, electoral: 0, cierre: 0 } };
       })
     };
   }

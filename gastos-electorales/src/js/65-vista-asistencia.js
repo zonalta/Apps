@@ -6,15 +6,29 @@
   var el = App.ui.el;
   var icono = App.ui.icono;
 
+  /* Las tres fases del proceso, en orden. */
+  var FASES = [
+    { id: 'previa', nombre: 'Fase previa' },
+    { id: 'electoral', nombre: 'Periodo electoral' },
+    { id: 'cierre', nombre: 'Fase de cierre' }
+  ];
+
+  /* Los ámbitos guardados antes de existir las fases no traen maxSesiones. */
+  function sesionesDe(ambito) {
+    if (!ambito.maxSesiones) { ambito.maxSesiones = { previa: 0, electoral: 0, cierre: 0 }; }
+    return ambito.maxSesiones;
+  }
+
   /* Campo numérico de una celda de la tabla, con su unidad al final. */
-  function celdaNumero(ambito, clave, sufijo, paso) {
+  function celdaNumero(ambito, clave, sufijo, paso, destino) {
+    var obj = destino ? sesionesDe(ambito) : ambito;
     var input = el('input', {
       type: 'number', min: '0', step: paso || '0.01',
-      value: ambito[clave],
+      value: obj[clave],
       'aria-label': clave + ' — ' + ambito.nombre,
       onInput: function (e) {
         var v = parseFloat(e.target.value);
-        App.store.muta(function () { ambito[clave] = isNaN(v) ? 0 : v; });
+        App.store.muta(function () { obj[clave] = isNaN(v) ? 0 : v; });
       }
     });
     var cont = el('div', {
@@ -26,7 +40,7 @@
 
   function ambitoNuevo() {
     var ids = App.store.estado().asistencia.ambitos.map(function (a) { return Number(String(a.id).slice(1)) || 0; });
-    return { id: 'a' + (Math.max.apply(null, ids.concat([0])) + 1), nombre: '', horasMax: 0, importeHora: 0, unidades: 0 };
+    return { id: 'a' + (Math.max.apply(null, ids.concat([0])) + 1), nombre: '', horasMax: 0, importeHora: 0, unidades: 0, maxSesiones: { previa: 0, electoral: 0, cierre: 0 } };
   }
 
   function quitar(ambito) {
@@ -103,6 +117,31 @@
     ]);
   }
 
+  function tarjetaSesiones() {
+    var ambitos = App.store.estado().asistencia.ambitos;
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [el('h2', {}, [icono('mesa'), 'Máximo de sesiones por fase'])]),
+      el('p', {
+        class: 'silencio',
+        text: 'Número máximo de sesiones de asistencia que puede realizar cada ámbito en cada fase. Los ámbitos se gestionan en el bloque de arriba.'
+      }),
+      ambitos.length
+        ? el('div', { class: 'tabla-scroll', style: 'margin-top:16px' }, [
+            el('table', {}, [
+              el('thead', {}, [el('tr', {}, [el('th', { text: 'Ámbito de actuación' })].concat(
+                FASES.map(function (f) { return el('th', { text: f.nombre }); })
+              ))]),
+              el('tbody', {}, ambitos.map(function (a) {
+                return el('tr', {}, [
+                  el('td', { style: 'white-space:normal;min-width:260px', text: a.nombre || '(ámbito sin nombre)' })
+                ].concat(FASES.map(function (f) { return celdaNumero(a, f.id, 'ses.', '1', true); })));
+              }))
+            ])
+          ])
+        : el('p', { class: 'sin-datos', text: 'Añada primero algún ámbito de actuación.' })
+    ]);
+  }
+
   App.vistas = App.vistas || {};
 
   App.vistas['asistencia-dashboard'] = {
@@ -118,6 +157,8 @@
   App.vistas['asistencia-config'] = {
     titulo: 'Configuración de Asistencia',
     subtitulo: 'Valores e importes de cada ámbito. Los cambios se guardan al instante.',
-    render: function () { return tarjetaAmbitos(); }
+    render: function () {
+      return el('div', { class: 'apilar', style: 'gap:24px' }, [tarjetaAmbitos(), tarjetaSesiones()]);
+    }
   };
 })(window.App = window.App || {});
