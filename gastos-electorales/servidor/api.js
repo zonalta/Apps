@@ -47,7 +47,7 @@ function leerCuerpo(req) {
 
 /* Sólo se aceptan las claves que la aplicación conoce. Un cliente manipulado no
    puede colar campos arbitrarios en la base de datos. */
-const CLAVES = ['convocatoria', 'config', 'mesas', 'representantes', 'policia', 'cargas'];
+const CLAVES = ['convocatoria', 'config', 'mesas', 'representantes', 'policia', 'cargas', 'asistencia'];
 
 function sanear(datos) {
   if (!datos || typeof datos !== 'object' || Array.isArray(datos)) {

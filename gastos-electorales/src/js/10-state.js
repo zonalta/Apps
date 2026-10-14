@@ -79,11 +79,33 @@
     };
   }
 
+  /* Ámbitos de actuación del módulo "Importe por asistencia". Los valores
+     numéricos arrancan a 0 para rellenarlos en Configuración de Asistencia. */
+  var AMBITOS_ASISTENCIA = [
+    'a) Coordinación, organización, estudio, informe, asesoramiento y propuestas de carácter superior en materia de gestión electoral',
+    'b) Estudio, emisión de informes y apoyo técnico',
+    'c) Estudio, emisión de informes y apoyo tecnológico',
+    'd) Apoyo administrativo',
+    'e) Coordinación de logística electoral',
+    'f) Apoyo en la logística electoral',
+    'g.1) Soporte a la transmisión de los resultados provisionales',
+    'g.2) Logística jornada de votación'
+  ];
+
+  function asistenciaPorDefecto() {
+    return {
+      ambitos: AMBITOS_ASISTENCIA.map(function (nombre, i) {
+        return { id: 'a' + (i + 1), nombre: nombre, horasMax: 0, importeHora: 0, unidades: 0, maxSesiones: { previa: 0, electoral: 0, cierre: 0 }, asistencias: { previa: 0, electoral: 0, cierre: 0 } };
+      })
+    };
+  }
+
   function estadoPorDefecto() {
     return {
       version: 1,
       convocatoria: 'Proceso electoral',
       config: configPorDefecto(),
+      asistencia: asistenciaPorDefecto(),
       mesas: {},            // codigo -> nº de mesas
       representantes: {},   // codigo -> { PD0: n, ... }
       policia: {},          // codigo -> nº de efectivos
