@@ -76,6 +76,12 @@
     return (Number(ambito.horasMax) || 0) * (Number(ambito.importeHora) || 0);
   }
 
+  /* Importe total de un ámbito: importe por sesión × asistencias × unidades
+     funcionales (cada unidad es una persona y cobra su sesión). */
+  function importeTotal(ambito) {
+    return importeSesion(ambito) * totalAsistencias(ambito) * (Number(ambito.unidades) || 0);
+  }
+
   function fila(ambito) {
     var celdaImporte = el('td', { class: 'n num', style: 'font-weight:600', text: App.ui.euro(importeSesion(ambito)) });
     function recalcular() { celdaImporte.textContent = App.ui.euro(importeSesion(ambito)); }
@@ -183,7 +189,7 @@
       var tAsis = 0, tImp = 0, tUni = 0;
       ambitos.forEach(function (a) {
         tAsis += totalAsistencias(a);
-        tImp += totalAsistencias(a) * importeSesion(a);
+        tImp += importeTotal(a);
         tUni += Number(a.unidades) || 0;
       });
       return { asis: tAsis, imp: tImp, uni: tUni };
@@ -211,7 +217,7 @@
       var celdaImporte = el('td', { class: 'n', style: 'font-weight:600' });
       function actualizar() {
         celdaTotal.textContent = App.ui.numero(totalAsistencias(a));
-        celdaImporte.textContent = App.ui.euro(totalAsistencias(a) * importeSesion(a));
+        celdaImporte.textContent = App.ui.euro(importeTotal(a));
       }
       actualizar();
 
@@ -240,7 +246,7 @@
       el('header', {}, [el('h2', {}, [icono('dashboard'), 'Asistencias por ámbito'])]),
       el('p', {
         class: 'silencio',
-        text: 'Introduzca las asistencias de cada ámbito en cada fase. El importe total es el importe por sesión de cada ámbito (Configuración) multiplicado por su total de asistencias.'
+        text: 'Introduzca las asistencias de cada ámbito en cada fase. El importe total es el importe por sesión de cada ámbito (Configuración) multiplicado por su total de asistencias y por sus unidades funcionales.'
       }),
       el('div', { class: 'tabla-scroll', style: 'margin-top:16px' }, [
         el('table', {}, [
