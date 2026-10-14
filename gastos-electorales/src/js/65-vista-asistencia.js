@@ -20,7 +20,7 @@
   }
 
   /* Campo numérico de una celda de la tabla, con su unidad al final. */
-  function celdaNumero(ambito, clave, sufijo, paso, destino) {
+  function celdaNumero(ambito, clave, sufijo, paso, destino, alCambiar) {
     var obj = destino ? sesionesDe(ambito) : ambito;
     var input = el('input', {
       type: 'number', min: '0', step: paso || '0.01',
@@ -29,6 +29,7 @@
       onInput: function (e) {
         var v = parseFloat(e.target.value);
         App.store.muta(function () { obj[clave] = isNaN(v) ? 0 : v; });
+        if (alCambiar) { alCambiar(); }
       }
     });
     var cont = el('div', {
@@ -58,7 +59,16 @@
     });
   }
 
+  /* Importe de una sesión: horas máximas × importe por hora. No se edita; se
+     recalcula al escribir en cualquiera de los dos campos. */
+  function importeSesion(ambito) {
+    return (Number(ambito.horasMax) || 0) * (Number(ambito.importeHora) || 0);
+  }
+
   function fila(ambito) {
+    var celdaImporte = el('td', { class: 'n num', style: 'font-weight:600', text: App.ui.euro(importeSesion(ambito)) });
+    function recalcular() { celdaImporte.textContent = App.ui.euro(importeSesion(ambito)); }
+
     return el('tr', {}, [
       el('td', { style: 'min-width:260px;width:36%;white-space:normal' }, [
         el('textarea', {
@@ -71,8 +81,9 @@
           }
         })
       ]),
-      celdaNumero(ambito, 'horasMax', 'h.'),
-      celdaNumero(ambito, 'importeHora', '€'),
+      celdaNumero(ambito, 'horasMax', 'h.', null, false, recalcular),
+      celdaNumero(ambito, 'importeHora', '€', null, false, recalcular),
+      celdaImporte,
       celdaNumero(ambito, 'unidades', '', '1'),
       el('td', {}, [
         el('button', {
@@ -107,6 +118,7 @@
                 el('th', { text: 'Ámbito de actuación' }),
                 el('th', { text: 'Horas máx. por asistencia' }),
                 el('th', { text: 'Importe por hora' }),
+                el('th', { class: 'n', text: 'Importe sesión' }),
                 el('th', { text: 'Unidades funcionales' }),
                 el('th', {})
               ])]),
