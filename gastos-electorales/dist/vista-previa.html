@@ -1183,7 +1183,7 @@ tfoot td {
   function asistenciaPorDefecto() {
     return {
       ambitos: AMBITOS_ASISTENCIA.map(function (nombre, i) {
-        return { id: 'a' + (i + 1), nombre: nombre, horasMax: 0, importeHora: 0, unidades: 0, maxSesiones: { previa: 0, electoral: 0, cierre: 0 } };
+        return { id: 'a' + (i + 1), nombre: nombre, horasMax: 0, importeHora: 0, unidades: 0, maxSesiones: { previa: 0, electoral: 0, cierre: 0 }, asistencias: { previa: 0, electoral: 0, cierre: 0 } };
       })
     };
   }
@@ -3554,6 +3554,17 @@ tfoot td {
     return ambito.maxSesiones;
   }
 
+  /* Asistencias realizadas por fase (se introducen en el Dashboard). */
+  function asistenciasDe(ambito) {
+    if (!ambito.asistencias) { ambito.asistencias = { previa: 0, electoral: 0, cierre: 0 }; }
+    return ambito.asistencias;
+  }
+
+  function totalAsistencias(ambito) {
+    var a = asistenciasDe(ambito);
+    return FASES.reduce(function (t, f) { return t + (Number(a[f.id]) || 0); }, 0);
+  }
+
   /* Campo numérico de una celda de la tabla, con su unidad al final. */
   function celdaNumero(ambito, clave, sufijo, paso, destino, alCambiar) {
     var obj = destino ? sesionesDe(ambito) : ambito;
@@ -3576,7 +3587,7 @@ tfoot td {
 
   function ambitoNuevo() {
     var ids = App.store.estado().asistencia.ambitos.map(function (a) { return Number(String(a.id).slice(1)) || 0; });
-    return { id: 'a' + (Math.max.apply(null, ids.concat([0])) + 1), nombre: '', horasMax: 0, importeHora: 0, unidades: 0, maxSesiones: { previa: 0, electoral: 0, cierre: 0 } };
+    return { id: 'a' + (Math.max.apply(null, ids.concat([0])) + 1), nombre: '', horasMax: 0, importeHora: 0, unidades: 0, maxSesiones: { previa: 0, electoral: 0, cierre: 0 }, asistencias: { previa: 0, electoral: 0, cierre: 0 } };
   }
 
   function quitar(ambito) {
@@ -3680,7 +3691,7 @@ tfoot td {
               ))]),
               el('tbody', {}, ambitos.map(function (a) {
                 return el('tr', {}, [
-                  el('td', { style: 'white-space:normal;min-width:260px', text: a.nombre || '(ámbito sin nombre)' })
+                  el('td', { style: 'white-space:normal;min-width:200px;width:30%', text: a.nombre || '(ámbito sin nombre)' })
                 ].concat(FASES.map(function (f) { return celdaNumero(a, f.id, 'ses.', '1', true); })));
               }))
             ])
@@ -3691,14 +3702,101 @@ tfoot td {
 
   App.vistas = App.vistas || {};
 
-  App.vistas['asistencia-dashboard'] = {
-    titulo: 'Dashboard de Asistencia',
-    subtitulo: 'Resultados del cálculo de importe por asistencia.',
-    render: function () {
+  /* Dashboard: una fila por ámbito con sus asistencias por fase, el total y el
+     importe (importe sesión × total de asistencias). Los totales se recalculan
+     al escribir, sin repintar la tabla. */
+  function tarjetaDashboard() {
+    var ambitos = App.store.estado().asistencia.ambitos;
+    if (!ambitos.length) {
       return el('section', { class: 'tarjeta' }, [
-        el('div', { class: 'aviso' }, [icono('aviso'), el('div', { text: 'Este apartado está pendiente de definir: aquí irán los resultados.' })])
+        el('p', { class: 'sin-datos', text: 'No hay ámbitos. Añádalos en Configuración de Asistencia.' })
       ]);
     }
+
+    var actualizadores = [];
+    function pieTotales() {
+      var tAsis = 0, tImp = 0, tUni = 0;
+      ambitos.forEach(function (a) {
+        tAsis += totalAsistencias(a);
+        tImp += totalAsistencias(a) * importeSesion(a);
+        tUni += Number(a.unidades) || 0;
+      });
+      return { asis: tAsis, imp: tImp, uni: tUni };
+    }
+
+    var celdaPieUni = el('td', { class: 'n' });
+    var celdaPieAsis = el('td', { class: 'n' });
+    var celdaPieImp = el('td', { class: 'n' });
+    var celdasPieFase = FASES.map(function () { return el('td', { class: 'n' }); });
+
+    function actualizarPie() {
+      var t = pieTotales();
+      celdaPieUni.textContent = App.ui.numero(t.uni);
+      celdaPieAsis.textContent = App.ui.numero(t.asis);
+      celdaPieImp.textContent = App.ui.euro(t.imp);
+      FASES.forEach(function (f, i) {
+        celdasPieFase[i].textContent = App.ui.numero(ambitos.reduce(function (s, a) {
+          return s + (Number(asistenciasDe(a)[f.id]) || 0);
+        }, 0));
+      });
+    }
+
+    var filas = ambitos.map(function (a) {
+      var celdaTotal = el('td', { class: 'n', style: 'font-weight:600' });
+      var celdaImporte = el('td', { class: 'n', style: 'font-weight:600' });
+      function actualizar() {
+        celdaTotal.textContent = App.ui.numero(totalAsistencias(a));
+        celdaImporte.textContent = App.ui.euro(totalAsistencias(a) * importeSesion(a));
+      }
+      actualizar();
+
+      var celdasFase = FASES.map(function (f) {
+        return el('td', {}, [el('input', {
+          type: 'number', min: '0', step: '1', style: 'width:76px',
+          value: asistenciasDe(a)[f.id],
+          'aria-label': f.nombre + ' — ' + a.nombre,
+          onInput: function (e) {
+            var v = parseFloat(e.target.value);
+            App.store.muta(function () { asistenciasDe(a)[f.id] = isNaN(v) ? 0 : v; });
+            actualizar();
+            actualizarPie();
+          }
+        })]);
+      });
+
+      return el('tr', {}, [
+        el('td', { style: 'white-space:normal;min-width:200px;width:30%', text: a.nombre || '(ámbito sin nombre)' }),
+        el('td', { class: 'n', text: App.ui.numero(Number(a.unidades) || 0) })
+      ].concat(celdasFase, [celdaTotal, celdaImporte]));
+    });
+    actualizarPie();
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [el('h2', {}, [icono('dashboard'), 'Asistencias por ámbito'])]),
+      el('p', {
+        class: 'silencio',
+        text: 'Introduzca las asistencias de cada ámbito en cada fase. El importe total es el importe por sesión de cada ámbito (Configuración) multiplicado por su total de asistencias.'
+      }),
+      el('div', { class: 'tabla-scroll', style: 'margin-top:16px' }, [
+        el('table', {}, [
+          el('thead', {}, [el('tr', {}, [
+            el('th', { text: 'Ámbito de actuación' }),
+            el('th', { class: 'n', style: 'white-space:normal', text: 'Unidades funcionales' })
+          ].concat(
+            FASES.map(function (f) { return el('th', { class: 'n', text: f.nombre }); }),
+            [el('th', { class: 'n', style: 'white-space:normal', text: 'Total asistencias' }), el('th', { class: 'n', text: 'Importe total' })]
+          ))]),
+          el('tbody', {}, filas),
+          el('tfoot', {}, [el('tr', {}, [el('td', { text: 'Total' }), celdaPieUni].concat(celdasPieFase, [celdaPieAsis, celdaPieImp]))])
+        ])
+      ])
+    ]);
+  }
+
+  App.vistas['asistencia-dashboard'] = {
+    titulo: 'Dashboard de Asistencia',
+    subtitulo: 'Asistencias realizadas por ámbito y fase, y su importe. Los cambios se guardan al instante.',
+    render: function () { return tarjetaDashboard(); }
   };
 
   App.vistas['asistencia-config'] = {
