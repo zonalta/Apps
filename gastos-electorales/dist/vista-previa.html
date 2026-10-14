@@ -3706,6 +3706,201 @@ tfoot td {
     ]);
   }
 
+  /* ---------- Análisis del Dashboard ---------- */
+
+  /* Un color por fase. Los tres se distinguen también por la leyenda y por
+     el importe que sale al pasar el ratón, no sólo por el tono. */
+  var COLOR_FASE = { previa: '#255dad', electoral: '#1b8a8a', cierre: '#c98a2b' };
+
+  /* Importe de un ámbito en una fase: importe sesión × asistencias × unidades. */
+  function importeFase(ambito, fase) {
+    return importeSesion(ambito) * (Number(asistenciasDe(ambito)[fase]) || 0) * (Number(ambito.unidades) || 0);
+  }
+
+  function datosAnalisis(ambitos) {
+    var porFase = { previa: 0, electoral: 0, cierre: 0 };
+    var filas = ambitos.map(function (a) {
+      var imp = {};
+      FASES.forEach(function (f) { imp[f.id] = importeFase(a, f.id); porFase[f.id] += imp[f.id]; });
+      return {
+        ambito: a, importes: imp,
+        total: importeTotal(a),
+        porUnidad: importeSesion(a) * totalAsistencias(a)
+      };
+    });
+    var total = filas.reduce(function (t, f) { return t + f.total; }, 0);
+    var asistencias = ambitos.reduce(function (t, a) { return t + totalAsistencias(a); }, 0);
+    return { filas: filas, porFase: porFase, total: total, asistencias: asistencias };
+  }
+
+  function pct(parte, total) { return total ? App.ui.porcentaje(parte, total) : '—'; }
+
+  function leyendaFases() {
+    return el('div', { class: 'fila', style: 'gap:16px;margin-bottom:12px' }, FASES.map(function (f) {
+      return el('span', { class: 'fila', style: 'gap:6px;font-size:12px' }, [
+        el('span', { style: 'width:12px;height:12px;border-radius:2px;background:' + COLOR_FASE[f.id] }),
+        f.nombre
+      ]);
+    }));
+  }
+
+  function indicadores(d) {
+    var fases = FASES.slice().sort(function (a, b) { return d.porFase[b.id] - d.porFase[a.id]; });
+    var cara = fases[0];
+
+    function tarjeta(etiqueta, valor, nota, destacado) {
+      return el('div', { class: 'tarjeta kpi' }, [
+        el('span', { class: 'etiqueta', text: etiqueta }),
+        el('span', { class: 'valor num' + (destacado ? ' destacado' : ''), text: valor }),
+        el('span', { class: 'nota', text: nota })
+      ]);
+    }
+
+    return el('div', { class: 'rejilla cuatro' }, [
+      tarjeta('Coste total', App.ui.euro(d.total), 'Suma de todos los ámbitos', true),
+      tarjeta('Asistencias', App.ui.numero(d.asistencias), 'Entre las tres fases'),
+      tarjeta('Coste medio por asistencia', d.asistencias ? App.ui.euro(d.total / d.asistencias) : '—', 'Coste total ÷ asistencias'),
+      tarjeta('Fase más cara', d.total ? cara.nombre : '—',
+        d.total ? App.ui.euro(d.porFase[cara.id]) + ' · ' + pct(d.porFase[cara.id], d.total) + ' del total' : 'Sin asistencias cargadas')
+    ]);
+  }
+
+  function tablaDesglose(d) {
+    var cuerpo = d.filas.map(function (f) {
+      return el('tr', {}, [
+        el('td', { style: 'white-space:normal;min-width:200px', text: f.ambito.nombre || '(ámbito sin nombre)' }),
+        el('td', { class: 'n', text: App.ui.numero(Number(f.ambito.unidades) || 0) })
+      ].concat(
+        FASES.map(function (fa) { return el('td', { class: 'n', text: App.ui.euro(f.importes[fa.id]) }); }),
+        [
+          el('td', { class: 'n', style: 'font-weight:600', text: App.ui.euro(f.total) }),
+          el('td', { class: 'n', text: App.ui.euro(f.porUnidad) }),
+          el('td', { class: 'n', text: pct(f.total, d.total) })
+        ]
+      ));
+    });
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [el('h2', {}, [icono('euro'), 'Desglose de importes por ámbito y fase'])]),
+      el('p', {
+        class: 'silencio',
+        text: 'Importe de cada fase (importe por sesión × asistencias × unidades funcionales) y lo que cuesta cada unidad funcional, es decir, cada persona del ámbito.'
+      }),
+      el('div', { class: 'tabla-scroll', style: 'margin-top:16px' }, [
+        el('table', {}, [
+          el('thead', {}, [el('tr', {}, [
+            el('th', { text: 'Ámbito de actuación' }),
+            el('th', { class: 'n', style: 'white-space:normal', text: 'Unidades funcionales' })
+          ].concat(
+            FASES.map(function (f) { return el('th', { class: 'n', text: f.nombre }); }),
+            [
+              el('th', { class: 'n', text: 'Total ámbito' }),
+              el('th', { class: 'n', style: 'white-space:normal', text: 'Coste por unidad funcional' }),
+              el('th', { class: 'n', text: '% del total' })
+            ]
+          ))]),
+          el('tbody', {}, cuerpo),
+          el('tfoot', {}, [el('tr', {}, [el('td', { text: 'Total' }), el('td', {})].concat(
+            FASES.map(function (f) { return el('td', { class: 'n', text: App.ui.euro(d.porFase[f.id]) }); }),
+            [el('td', { class: 'n', text: App.ui.euro(d.total) }), el('td', {}), el('td', { class: 'n', text: d.total ? '100 %' : '—' })]
+          ))])
+        ])
+      ])
+    ]);
+  }
+
+  function graficaApilada(d) {
+    var max = d.filas.reduce(function (m, f) { return Math.max(m, f.total); }, 0);
+    var contenido;
+    if (!max) {
+      contenido = el('p', { class: 'gr-vacia', text: 'Sin importes que representar: introduzca asistencias.' });
+    } else {
+      contenido = el('div', { class: 'gr-barras' }, d.filas.map(function (f) {
+        var nombre = f.ambito.nombre || '(ámbito sin nombre)';
+        return el('div', { class: 'gr-fila' }, [
+          el('span', { class: 'gr-etiqueta', title: nombre, text: nombre }),
+          el('div', { class: 'gr-pista', style: 'display:flex' }, FASES.map(function (fa) {
+            var v = f.importes[fa.id];
+            return el('div', {
+              title: fa.nombre + ': ' + App.ui.euro(v),
+              style: 'height:100%;width:' + (v / max * 100) + '%;background:' + COLOR_FASE[fa.id]
+            });
+          })),
+          el('span', { class: 'gr-valor', text: App.ui.euro(f.total) })
+        ]);
+      }));
+    }
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [el('h2', { text: 'Importe por ámbito, dividido por fases' })]),
+      leyendaFases(),
+      contenido
+    ]);
+  }
+
+  /* Asistencias frente al máximo de sesiones configurado. Sin máximo (0) no se
+     juzga: se muestra el dato sin barra. Por encima del máximo se marca en rojo. */
+  function ocupacion(ambitos) {
+    function celda(ambito, fase) {
+      var n = Number(asistenciasDe(ambito)[fase]) || 0;
+      var m = Number(sesionesDe(ambito)[fase]) || 0;
+      if (!m) {
+        return el('td', {}, [el('span', { class: 'silencio', text: n + ' / sin máximo' })]);
+      }
+      var excede = n > m;
+      return el('td', {}, [
+        el('div', { style: 'display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:4px' }, [
+          el('span', { class: 'num', style: excede ? 'color:var(--error);font-weight:600' : '', text: n + ' / ' + m }),
+          excede ? el('span', { class: 'chip', style: 'background:var(--error-container);color:var(--error)', text: 'Supera el máximo' }) : null
+        ]),
+        el('div', { class: 'gr-pista', style: 'height:8px' }, [
+          el('div', {
+            class: 'gr-barra',
+            style: 'width:' + Math.min(100, n / m * 100) + '%;background:' + (excede ? 'var(--error)' : COLOR_FASE[fase])
+          })
+        ])
+      ]);
+    }
+
+    var excesos = 0;
+    ambitos.forEach(function (a) {
+      FASES.forEach(function (f) {
+        var m = Number(sesionesDe(a)[f.id]) || 0;
+        if (m && (Number(asistenciasDe(a)[f.id]) || 0) > m) { excesos++; }
+      });
+    });
+
+    return el('section', { class: 'tarjeta' }, [
+      el('header', {}, [
+        el('h2', { text: 'Asistencias frente al máximo de sesiones' }),
+        excesos
+          ? el('span', { class: 'chip', style: 'background:var(--error-container);color:var(--error)', text: excesos + (excesos === 1 ? ' fase supera' : ' fases superan') + ' su máximo' })
+          : el('span', { class: 'chip ok', text: 'Todo dentro de los máximos' })
+      ]),
+      el('p', { class: 'silencio', text: 'Máximos definidos en Configuración de Asistencia.' }),
+      el('div', { class: 'tabla-scroll', style: 'margin-top:16px' }, [
+        el('table', {}, [
+          el('thead', {}, [el('tr', {}, [el('th', { text: 'Ámbito de actuación' })].concat(
+            FASES.map(function (f) { return el('th', { text: f.nombre }); })
+          ))]),
+          el('tbody', {}, ambitos.map(function (a) {
+            return el('tr', {}, [
+              el('td', { style: 'white-space:normal;min-width:200px', text: a.nombre || '(ámbito sin nombre)' })
+            ].concat(FASES.map(function (f) { return celda(a, f.id); })));
+          }))
+        ])
+      ])
+    ]);
+  }
+
+  /* Se repinta entero cada vez que cambia una asistencia: son pocas filas. */
+  function pintarAnalisis(contenedor, ambitos) {
+    var d = datosAnalisis(ambitos);
+    App.ui.vaciar(contenedor);
+    [indicadores(d), tablaDesglose(d), graficaApilada(d), ocupacion(ambitos)].forEach(function (n) {
+      contenedor.appendChild(n);
+    });
+  }
+
   App.vistas = App.vistas || {};
 
   /* Dashboard: una fila por ámbito con sus asistencias por fase, el total y el
@@ -3719,7 +3914,7 @@ tfoot td {
       ]);
     }
 
-    var actualizadores = [];
+    var analisis = el('div', { class: 'apilar', style: 'gap:24px' });
     function pieTotales() {
       var tAsis = 0, tImp = 0, tUni = 0;
       ambitos.forEach(function (a) {
@@ -3745,6 +3940,7 @@ tfoot td {
           return s + (Number(asistenciasDe(a)[f.id]) || 0);
         }, 0));
       });
+      pintarAnalisis(analisis, ambitos);
     }
 
     var filas = ambitos.map(function (a) {
@@ -3777,7 +3973,7 @@ tfoot td {
     });
     actualizarPie();
 
-    return el('section', { class: 'tarjeta' }, [
+    var tarjetaTabla = el('section', { class: 'tarjeta' }, [
       el('header', {}, [el('h2', {}, [icono('dashboard'), 'Asistencias por ámbito'])]),
       el('p', {
         class: 'silencio',
@@ -3797,6 +3993,8 @@ tfoot td {
         ])
       ])
     ]);
+
+    return el('div', { class: 'apilar', style: 'gap:24px' }, [tarjetaTabla, analisis]);
   }
 
   App.vistas['asistencia-dashboard'] = {
