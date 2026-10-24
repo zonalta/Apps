@@ -79,25 +79,75 @@
     };
   }
 
-  /* Ámbitos de actuación del módulo "Importe por asistencia". Los valores
-     numéricos arrancan a 0 para rellenarlos en Configuración de Asistencia. */
-  var AMBITOS_ASISTENCIA = [
-    'a) Coordinación, organización, estudio, informe, asesoramiento y propuestas de carácter superior en materia de gestión electoral',
-    'b) Estudio, emisión de informes y apoyo técnico',
-    'c) Estudio, emisión de informes y apoyo tecnológico',
-    'd) Apoyo administrativo',
-    'e) Coordinación de logística electoral',
-    'f) Apoyo en la logística electoral',
-    'g.1) Soporte a la transmisión de los resultados provisionales',
-    'g.2) Logística jornada de votación'
+  /* Ámbitos de actuación del módulo "Importe por asistencia", agrupados.
+     La numeración (1, 1.1, 1.2…) sale de la posición, no se guarda: así
+     añadir o quitar grupos y ámbitos nunca la deja desordenada.
+     `antes` es el id que tenía el ámbito en la lista plana anterior, para
+     conservar sus datos al migrar; `unidades: null` significa que la tabla
+     de origen no da valor y se mantiene el que hubiera. */
+  var GRUPOS_ASISTENCIA = [
+    { id: 'g1', nombre: 'Oficina electoral', ambitos: [
+      { id: 'a1', antes: 'a1', unidades: 1, nombre: 'Coordinación, organización, estudio, informe, asesoramiento y propuestas de carácter superior en materia de gestión electoral' },
+      { id: 'a2', antes: 'a2', unidades: 2, nombre: 'Estudio, emisión de informes y apoyo técnico en la gestión de los asuntos de la unidad' },
+      { id: 'a3', antes: 'a3', unidades: 1, nombre: 'Estudio, emisión de informes y apoyo tecnológico en la gestión de los asuntos de la unidad' },
+      { id: 'a4', antes: 'a4', unidades: 2, nombre: 'Apoyo administrativo en el desarrollo de las funciones propias de la unidad' }
+    ] },
+    { id: 'g2', nombre: 'Centro Logístico', ambitos: [
+      { id: 'a5', antes: 'a5', unidades: 2, nombre: 'Coordinación de logística electoral' },
+      { id: 'a6', antes: 'a6', unidades: null, nombre: 'Apoyo en la logística electoral' }
+    ] },
+    { id: 'g3', nombre: 'Centro de Difusión de Datos', ambitos: [
+      { id: 'a9', antes: null, unidades: 2, nombre: 'Asesoramiento y apoyo en la instalación de la infraestructura y sistema de cableado para la difusión de resultados' },
+      { id: 'a10', antes: null, unidades: 1, nombre: 'Asesoramiento y apoyo en la instalación de los sistemas de seguridad en las redes' }
+    ] },
+    { id: 'g4', nombre: 'Jornada electoral', ambitos: [
+      { id: 'a11', antes: null, unidades: null, nombre: 'Formación en la aplicación de gestión de incidencias de las mesas electorales y participación en simulacro electoral' },
+      { id: 'a7', antes: 'a7', unidades: null, nombre: 'Soporte a la transmisión de los resultados provisionales en la jornada electoral' },
+      { id: 'a8', antes: 'a8', unidades: null, nombre: 'Logística jornada de votación' }
+    ] }
   ];
 
-  function asistenciaPorDefecto() {
-    return {
-      ambitos: AMBITOS_ASISTENCIA.map(function (nombre, i) {
-        return { id: 'a' + (i + 1), nombre: nombre, horasMax: 0, importeHora: 0, unidades: 0, maxSesiones: { previa: 0, electoral: 0, cierre: 0 }, asistencias: { previa: 0, electoral: 0, cierre: 0 } };
-      })
-    };
+  function ceroFases() { return { previa: 0, electoral: 0, cierre: 0 }; }
+
+  /* Construye los grupos por defecto. Si se pasan los ámbitos de la versión
+     anterior (lista plana, por id), se les conservan los datos; los que no
+     encajan en la tabla nueva se guardan en un grupo «Sin clasificar» para no
+     perder nada. */
+  function asistenciaPorDefecto(viejos) {
+    var usados = {};
+    var grupos = GRUPOS_ASISTENCIA.map(function (g) {
+      return {
+        id: g.id, nombre: g.nombre,
+        ambitos: g.ambitos.map(function (d) {
+          var v = d.antes && viejos ? viejos[d.antes] : null;
+          if (v) { usados[v.id] = true; }
+          return {
+            id: d.id, nombre: d.nombre,
+            horasMax: v ? Number(v.horasMax) || 0 : 0,
+            importeHora: v ? Number(v.importeHora) || 0 : 0,
+            unidades: d.unidades != null ? d.unidades : (v ? Number(v.unidades) || 0 : 0),
+            maxSesiones: Object.assign(ceroFases(), v && v.maxSesiones),
+            asistencias: Object.assign(ceroFases(), v && v.asistencias)
+          };
+        })
+      };
+    });
+    var huerfanos = viejos ? Object.keys(viejos).filter(function (id) { return !usados[id]; }) : [];
+    if (huerfanos.length) {
+      grupos.push({ id: 'g5', nombre: 'Sin clasificar', ambitos: huerfanos.map(function (id) { return viejos[id]; }) });
+    }
+    return { grupos: grupos };
+  }
+
+  /* Las versiones anteriores guardaban una lista plana en asistencia.ambitos.
+     Se convierte a grupos antes de mezclar con lo guardado. */
+  function migrarAsistencia(guardado) {
+    var a = guardado && guardado.asistencia;
+    if (!a || a.grupos || !Array.isArray(a.ambitos)) { return guardado; }
+    var viejos = {};
+    a.ambitos.forEach(function (x) { viejos[x.id] = x; });
+    guardado.asistencia = asistenciaPorDefecto(viejos);
+    return guardado;
   }
 
   function estadoPorDefecto() {
@@ -235,7 +285,7 @@
 
   function aplicarRegistro(registro) {
     var base = estadoPorDefecto();
-    fusiona(base, registro.datos || {});
+    fusiona(base, migrarAsistencia(registro.datos || {}));
     estado = base;
     sync.version = registro.version || 0;
     sync.actualizado = registro.actualizado || null;
@@ -312,7 +362,7 @@
     exportar: function () { return JSON.parse(JSON.stringify(estado)); },
 
     importar: function (obj) {
-      estado = fusiona(estadoPorDefecto(), obj);
+      estado = fusiona(estadoPorDefecto(), migrarAsistencia(obj));
       guardarEnNavegador();
       programarGuardado();
       notificar();
