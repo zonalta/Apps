@@ -308,9 +308,13 @@
     return t;
   }
 
-  function datosAnalisis() {
-    var gs = grupos().map(function (g, gi) {
-      return {
+  /* `ids` limita el análisis a esos grupos (los de una exportación); sin él
+     se analizan todos. La numeración es siempre la del orden real. */
+  function datosAnalisis(ids) {
+    var gs = [];
+    grupos().forEach(function (g, gi) {
+      if (ids && ids.indexOf(g.id) < 0) { return; }
+      gs.push({
         grupo: g, numero: numeroGrupo(gi), sub: sumar(g.ambitos),
         filas: g.ambitos.map(function (a, ai) {
           var s1 = sumar([a]);
@@ -319,10 +323,11 @@
             porUnidad: importeSesion(a) * totalAsistencias(a)
           };
         })
-      };
+      });
     });
-    var todo = sumar(todosLosAmbitos());
-    return { grupos: gs, porFase: todo.importes, total: todo.total, asistencias: todo.asistencias };
+    var elegidos = gs.reduce(function (t, gd) { return t.concat(gd.grupo.ambitos); }, []);
+    var todo = sumar(elegidos);
+    return { grupos: gs, porFase: todo.importes, total: todo.total, asistencias: todo.asistencias, unidades: todo.unidades };
   }
 
   function pct(parte, total) { return total ? App.ui.porcentaje(parte, total) : '—'; }
@@ -631,7 +636,10 @@
     actualizarPie();
 
     var tarjetaTabla = el('section', { class: 'tarjeta' }, [
-      el('header', {}, [el('h2', {}, [icono('dashboard'), 'Asistencias por ámbito'])]),
+      el('header', {}, [
+        el('h2', {}, [icono('dashboard'), 'Asistencias por ámbito']),
+        el('button', { class: 'btn', onClick: function () { App.asistencia.exportar(); } }, [icono('descarga', 16), 'Exportar'])
+      ]),
       el('p', {
         class: 'silencio',
         text: 'Introduzca las asistencias de cada ámbito en cada fase. Cada grupo (fila sombreada) muestra el subtotal de sus ámbitos y se puede contraer o expandir. El importe total es el importe por asistencia del ámbito (Configuración) multiplicado por su total de asistencias y por sus unidades funcionales.'
@@ -653,6 +661,15 @@
 
     return el('div', { class: 'apilar', style: 'gap:24px' }, [tarjetaTabla, analisis]);
   }
+
+  /* Lo que necesita la exportación (66-exportar-asistencia.js). */
+  App.asistencia = {
+    FASES: FASES, COLOR_FASE: COLOR_FASE,
+    grupos: grupos, numeroGrupo: numeroGrupo, numeroAmbito: numeroAmbito, nombreDe: nombreDe,
+    todosLosAmbitos: todosLosAmbitos, datosAnalisis: datosAnalisis, sumar: sumar,
+    importeSesion: importeSesion, importeTotal: importeTotal, importeFase: importeFase,
+    totalAsistencias: totalAsistencias, asistenciasDe: asistenciasDe, sesionesDe: sesionesDe
+  };
 
   App.vistas['asistencia-dashboard'] = {
     titulo: 'Dashboard de Asistencia',

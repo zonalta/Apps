@@ -653,3 +653,13 @@ tr.fila-grupo td input[type="text"] { background: var(--surface); }
 .grupo-toggle .chev { width: 12px; font-size: 12px; }
 .gr-fila.gr-grupo { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--gridline); }
 .gr-fila.gr-grupo .grupo-toggle { white-space: normal; }
+
+.modal.ancho { width: min(640px, 100%); max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
+.modal.ancho .cuerpo-modal { overflow-y: auto; }
+.bloque-export { display: flex; flex-direction: column; gap: 6px; }
+.bloque-export > strong { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--on-surface-variant); }
+.bloque-export .lista-check { max-height: none; }
+.bloque-export textarea { width: 100%; font: inherit; padding: 8px 12px; border: 1px solid var(--outline); border-radius: var(--radio); resize: vertical; }
+.rejilla-export { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.bloque-export .opcion-check .texto { white-space: normal; }
+@media (max-width: 600px) { .rejilla-export { grid-template-columns: 1fr; } }
