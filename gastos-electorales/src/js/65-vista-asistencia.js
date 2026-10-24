@@ -232,7 +232,7 @@
                 el('th', { text: 'Grupo / ámbito de actuación' }),
                 el('th', { text: 'Horas máx. por asistencia' }),
                 el('th', { text: 'Importe por hora' }),
-                el('th', { class: 'n', text: 'Importe sesión' }),
+                el('th', { class: 'n', text: 'Importe asistencia' }),
                 el('th', { text: 'Unidades funcionales' }),
                 el('th', {})
               ])]),
@@ -393,7 +393,7 @@
       el('header', {}, [el('h2', {}, [icono('euro'), 'Desglose de importes por ámbito y fase'])]),
       el('p', {
         class: 'silencio',
-        text: 'Importe de cada fase (importe por sesión × asistencias × unidades funcionales), con el subtotal de cada grupo, y lo que cuesta cada unidad funcional, es decir, cada persona del ámbito.'
+        text: 'Importe de cada fase (importe por asistencia × asistencias × unidades funcionales), con el subtotal de cada grupo, y lo que cuesta cada unidad funcional, es decir, cada persona del ámbito.'
       }),
       el('div', { class: 'tabla-scroll', style: 'margin-top:16px' }, [
         el('table', {}, [
@@ -634,7 +634,7 @@
       el('header', {}, [el('h2', {}, [icono('dashboard'), 'Asistencias por ámbito'])]),
       el('p', {
         class: 'silencio',
-        text: 'Introduzca las asistencias de cada ámbito en cada fase. Cada grupo (fila sombreada) muestra el subtotal de sus ámbitos y se puede contraer o expandir. El importe total es el importe por sesión del ámbito (Configuración) multiplicado por su total de asistencias y por sus unidades funcionales.'
+        text: 'Introduzca las asistencias de cada ámbito en cada fase. Cada grupo (fila sombreada) muestra el subtotal de sus ámbitos y se puede contraer o expandir. El importe total es el importe por asistencia del ámbito (Configuración) multiplicado por su total de asistencias y por sus unidades funcionales.'
       }),
       el('div', { class: 'tabla-scroll', style: 'margin-top:16px' }, [
         el('table', {}, [
