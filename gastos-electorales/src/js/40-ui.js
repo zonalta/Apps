@@ -190,12 +190,17 @@
 
     var botonConfirmar = el('button', {
       class: 'btn' + (opciones.peligro ? ' peligro-solido' : ''),
-      onClick: function () { cerrar(true); }
+      onClick: function () {
+        /* `validar` puede negarse a cerrar (p. ej. un formulario sin rellenar). */
+        if (opciones.validar && opciones.validar() === false) { return; }
+        cerrar(true);
+      }
     }, opciones.textoConfirmar || 'Confirmar');
 
     var cuerpo = [
       el('h2', { id: 'titulo-modal', text: opciones.titulo })
     ];
+    if (opciones.contenido) { cuerpo.push(opciones.contenido); }
     (opciones.parrafos || []).forEach(function (p) {
       cuerpo.push(el('p', { text: p }));
     });
@@ -209,7 +214,7 @@
     }
 
     var dialogo = el('div', {
-      class: 'modal',
+      class: 'modal' + (opciones.ancho ? ' ancho' : ''),
       role: 'dialog',
       'aria-modal': 'true',
       'aria-labelledby': 'titulo-modal',
@@ -268,6 +273,17 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
 
+  /* Descarga de un fichero binario (p. ej. un .xlsx) a partir de sus bytes. */
+  function descargarBinario(nombre, bytes, tipo) {
+    var blob = new Blob([bytes], { type: tipo || 'application/octet-stream' });
+    var url = URL.createObjectURL(blob);
+    var a = el('a', { href: url, download: nombre });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
   function aCSV(filas) {
     return filas.map(function (fila) {
       return fila.map(function (celda) {
@@ -291,6 +307,7 @@
     enMarco: enMarco,
     flotante: flotante,
     descargar: descargar,
+    descargarBinario: descargarBinario,
     aCSV: aCSV
   };
 })(window.App = window.App || {});
