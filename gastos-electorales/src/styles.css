@@ -635,3 +635,21 @@ tfoot td {
 }
 .fila-usuario:not(:last-child) { margin-bottom: 8px; }
 .fila-usuario .crece { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Grupos plegables (módulo de asistencia) ---------- */
+
+tbody tr.fila-grupo,
+tbody tr.fila-grupo:hover { background: var(--surface-container); }
+tr.fila-grupo td { font-weight: 600; border-bottom: 1px solid var(--outline); }
+tr.fila-grupo td input[type="text"] { background: var(--surface); }
+.grupo-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 2px 6px; margin-left: -6px;
+  border: 0; border-radius: var(--radio);
+  background: transparent; color: var(--primary);
+  font-weight: 700; text-align: left;
+}
+.grupo-toggle:hover { background: var(--secondary-container); }
+.grupo-toggle .chev { width: 12px; font-size: 12px; }
+.gr-fila.gr-grupo { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--gridline); }
+.gr-fila.gr-grupo .grupo-toggle { white-space: normal; }
