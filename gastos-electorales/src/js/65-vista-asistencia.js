@@ -9,7 +9,7 @@
   /* Las tres fases del proceso, en orden. */
   var FASES = [
     { id: 'previa', nombre: 'Fase previa' },
-    { id: 'electoral', nombre: 'Periodo electoral' },
+    { id: 'electoral', nombre: 'Fase electoral' },
     { id: 'cierre', nombre: 'Fase de cierre' }
   ];
 
